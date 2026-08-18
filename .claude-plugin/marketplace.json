@@ -1,5 +1,6 @@
 {
   "name": "agent-vault",
+  "description": "A single-plugin marketplace for Agent Vault, durable linked project memory for Claude Code and Codex.",
   "owner": {
     "name": "David Colon",
     "email": "38386583+Da-Colon@users.noreply.github.com"

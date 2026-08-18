@@ -26,7 +26,7 @@ The product of bootstrap is an **OKF knowledge bundle**: a directory of markdown
 
 Run `${AGENT_VAULT_PLUGIN_ROOT}/bin/bootstrap-project.sh`. It locates the vault root (fixed location `~/agent-vault`, overridable via `AGENT_VAULT`), resolves the project name from git-root basename, creates the layer directories and `tasks/tasks.sqlite3`, writes a typed starter `README.md`, and writes the root `index.md` declaring `okf_version: "0.2"`. Existing files are left alone. If legacy task Markdown exists, bootstrap fails closed and names the migration command rather than creating a second task authority.
 
-Before extraction, verify that `<project-path>/index.md` declares OKF v0.2 and that `${AGENT_VAULT_PLUGIN_ROOT}/bin/task-db.py --project <project-path> validate` succeeds. If either check fails, stop and report that the scaffold is incomplete; do not describe the project as bootstrapped.
+Before extraction, verify that `<project-path>/index.md` declares OKF v0.2 and that `${AGENT_VAULT_PLUGIN_ROOT}/bin/task-db.py validate <project-path>` succeeds. If either check fails, stop and report that the scaffold is incomplete; do not describe the project as bootstrapped.
 
 ## Phase 2 — extraction (observable only, and linked)
 
