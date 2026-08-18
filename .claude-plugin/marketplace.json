@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "agent-vault",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "description": "Durable project memory for Claude Code: linked OKF knowledge, SQLite-backed tasks, decisions, journals, handoffs, a local viewer, and quiet lifecycle hooks under ~/agent-vault.",
       "author": {
         "name": "David Colon"

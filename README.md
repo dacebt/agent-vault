@@ -200,6 +200,8 @@ The Claude Code manifest declares hooks inline with `${CLAUDE_PLUGIN_ROOT}`. The
 
 This repository is the distributable downstream mirror, not the development authority for the mirrored components. Plugin changes originate, land, and are verified in `ebt-agent-skills/plugins/ebt-vault`; viewer changes originate, land, and are verified in the standalone `ebt-vault-viewer` repository. Once that upstream work is complete, it is adapted to the Agent Vault namespace and parroted into this repository. Do not develop independent plugin or viewer behavior here first.
 
+That synchronization rule governs implementation, not release numbering. Agent Vault owns its marketplace and manifest versions independently; they do not need to match the `ebt-vault` plugin version in `ebt-agent-skills`.
+
 ## Provenance
 
 Agent Vault began as the `ebt-vault` plugin inside the private `ebt-agent-skills` collection. This repository is its standalone, publicly distributable form with an independent plugin name, marketplace, storage root, environment namespace, cache namespace, generated provenance, and repository documentation. The bundled viewer is mirrored from the standalone `ebt-vault-viewer` project.
