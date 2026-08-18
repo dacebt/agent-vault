@@ -184,8 +184,6 @@ The Claude Code manifest declares hooks inline with `${CLAUDE_PLUGIN_ROOT}`. The
 
 Agent Vault began as the `ebt-vault` plugin inside the private `ebt-agent-skills` collection. This repository is its standalone, publicly distributable form with an independent plugin name, marketplace, storage root, environment namespace, cache namespace, generated provenance, and repository documentation.
 
-Agent Vault does not replace or modify the original plugin or its vault directory.
-
 ## License
 
 Agent Vault is available under the [MIT License](LICENSE).
