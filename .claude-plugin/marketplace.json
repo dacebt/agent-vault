@@ -1,0 +1,19 @@
+{
+  "name": "agent-vault",
+  "owner": {
+    "name": "David Colon",
+    "email": "38386583+Da-Colon@users.noreply.github.com"
+  },
+  "plugins": [
+    {
+      "name": "agent-vault",
+      "version": "0.10.0",
+      "description": "Durable project memory for Claude Code: linked OKF knowledge, SQLite-backed tasks, decisions, journals, handoffs, views, and quiet lifecycle hooks under ~/agent-vault.",
+      "author": {
+        "name": "David Colon"
+      },
+      "source": "./plugins/agent-vault",
+      "category": "workflow"
+    }
+  ]
+}

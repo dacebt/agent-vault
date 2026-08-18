@@ -1,0 +1,67 @@
+{
+  "name": "agent-vault",
+  "version": "0.10.0",
+  "description": "A durable project-memory plugin for Claude Code backed by independently bootstrapped bundles under ~/agent-vault (overridable via AGENT_VAULT). Each project combines OKF v0.2 Markdown concepts with SQLite-backed tasks, decisions, knowledge, journals, handoffs, and on-demand views. SessionStart orients, PostToolUse links commits, PreCompact preserves volatile state, and SessionEnd captures substantive work. Silently no-ops outside a tracked project bundle.",
+  "author": {
+    "name": "David Colon",
+    "email": "38386583+Da-Colon@users.noreply.github.com"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-session-start.sh",
+            "statusMessage": "Orienting from Agent Vault"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-git-commit-link.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-user-prompt-wrapup.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-precompact-handoff.sh",
+            "statusMessage": "Writing pre-compaction handoff to Agent Vault",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-sessionend-capture.sh",
+            "statusMessage": "Capturing session to Agent Vault",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "agent-vault",
+  "interface": {
+    "displayName": "Agent Vault"
+  },
+  "plugins": [
+    {
+      "name": "agent-vault",
+      "source": {
+        "source": "local",
+        "path": "./plugins/agent-vault"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

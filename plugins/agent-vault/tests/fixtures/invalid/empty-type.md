@@ -1,0 +1,4 @@
+---
+type: ""
+---
+# Empty type

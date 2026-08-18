@@ -1,0 +1,40 @@
+{
+  "name": "agent-vault",
+  "version": "0.10.0",
+  "description": "External-brain skills and quiet hooks over project-owned OKF bundles with SQLite task concepts.",
+  "author": {
+    "name": "David Colon",
+    "email": "38386583+Da-Colon@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/dacebt/agent-vault/tree/main/plugins/agent-vault",
+  "repository": "https://github.com/dacebt/agent-vault",
+  "license": "MIT",
+  "keywords": [
+    "external-brain",
+    "okf-bundle",
+    "project-memory",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "Agent Vault",
+    "shortDescription": "Use a project-owned OKF bundle as memory.",
+    "longDescription": "Agent Vault gives Codex durable project memory through independently bootstrapped OKF bundles under ~/agent-vault (overridable via AGENT_VAULT), SQLite-backed task concepts, and quiet lifecycle hooks that orient sessions, link commits, preserve pre-compaction state, and capture root-thread teardown.",
+    "developerName": "David Colon",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/dacebt/agent-vault",
+    "defaultPrompt": [
+      "Orient from the project vault.",
+      "Capture this decision in the vault.",
+      "Write a grounded project status update."
+    ],
+    "brandColor": "#0F766E",
+    "screenshots": []
+  }
+}
