@@ -1,6 +1,6 @@
 # Agent Vault
 
-Agent Vault is a standalone project-memory plugin for Claude Code and Codex. It gives each source repository a durable external brain containing linked knowledge, architectural decisions, task coordination, dated journals, unfinished-work handoffs, and generated HTML views.
+Agent Vault is a standalone project-memory plugin for Claude Code and Codex. It gives each source repository a durable external brain containing linked knowledge, architectural decisions, task coordination, dated journals, unfinished-work handoffs, and a bundled local HTML viewer.
 
 The plugin keeps that memory outside the source repository under `~/agent-vault` by default. Each direct child is an independently bootstrapped project bundle whose name matches its source repository. The source repo owns the product; Agent Vault owns what agents need to remember about it.
 
@@ -69,6 +69,7 @@ PreCompact and SessionEnd use `codex exec` for their headless transcript reconst
 | `agent-vault:refresh`   | Check current-reality claims against the source repository.                                                     |
 | `agent-vault:render`    | Build a browser-openable HTML view of project state.                                                            |
 | `agent-vault:task-flow` | Move SQLite-backed tasks through their lifecycle with acceptance and outcome discipline.                        |
+| `agent-vault:viewer`    | Start, inspect, or stop the bundled read-only local browser viewer.                                             |
 | `agent-vault:weave`     | Audit and repair graph links, indexes, orphans, and stale references.                                           |
 
 ## Installation
@@ -116,6 +117,18 @@ Agent Vault never falls back to another product’s directory. Its default and o
 
 Once installed, open Claude Code or Codex inside a source repository and ask it to run `agent-vault:bootstrap`. Bootstrap creates `<vault-root>/<git-root-basename>` and initializes the Markdown bundle plus `tasks/tasks.sqlite3`.
 
+## Run the local viewer
+
+Ask an agent to use `agent-vault:viewer`, or manage the bundled loopback server directly from this checkout:
+
+```sh
+bash plugins/agent-vault/bin/viewer.sh start
+bash plugins/agent-vault/bin/viewer.sh status
+bash plugins/agent-vault/bin/viewer.sh stop
+```
+
+The viewer serves `http://127.0.0.1:7373` by default, reads the configured Agent Vault root, and opens SQLite task stores read-only. It has no package-install or build step. Set `AGENT_VAULT` or `PORT` before invoking the command to override the defaults.
+
 ## Requirements
 
 Core operation requires:
@@ -127,6 +140,8 @@ Core operation requires:
 - Python 3 with its standard `sqlite3` module
 
 Optional OKF validation, OKF v0.1 upgrades, and legacy Markdown-task migration additionally require Ruby with standard-library YAML/Psych support. Automatic PreCompact and SessionEnd capture additionally require the Codex CLI.
+
+The optional local viewer requires Node.js 22.13 or newer so `node:sqlite` is available without an experimental flag.
 
 The shell utilities include BSD/macOS and GNU/Linux fallbacks where their command syntax differs.
 
@@ -173,6 +188,7 @@ agent-vault/
 │       ├── lib/
 │       ├── templates/
 │       ├── reference/
+│       ├── viewer/
 │       └── tests/
 ├── LICENSE
 └── README.md
@@ -180,9 +196,13 @@ agent-vault/
 
 The Claude Code manifest declares hooks inline with `${CLAUDE_PLUGIN_ROOT}`. The Codex manifest points to `hooks.json`, whose commands use `${PLUGIN_ROOT}`. The hook scripts accept either host variable and fall back to their own installed location. Skills resolve bundled files from the loaded skill path rather than from a development checkout.
 
+## Upstream synchronization
+
+This repository is the distributable downstream mirror, not the development authority for the mirrored components. Plugin changes originate, land, and are verified in `ebt-agent-skills/plugins/ebt-vault`; viewer changes originate, land, and are verified in the standalone `ebt-vault-viewer` repository. Once that upstream work is complete, it is adapted to the Agent Vault namespace and parroted into this repository. Do not develop independent plugin or viewer behavior here first.
+
 ## Provenance
 
-Agent Vault began as the `ebt-vault` plugin inside the private `ebt-agent-skills` collection. This repository is its standalone, publicly distributable form with an independent plugin name, marketplace, storage root, environment namespace, cache namespace, generated provenance, and repository documentation.
+Agent Vault began as the `ebt-vault` plugin inside the private `ebt-agent-skills` collection. This repository is its standalone, publicly distributable form with an independent plugin name, marketplace, storage root, environment namespace, cache namespace, generated provenance, and repository documentation. The bundled viewer is mirrored from the standalone `ebt-vault-viewer` project.
 
 ## License
 

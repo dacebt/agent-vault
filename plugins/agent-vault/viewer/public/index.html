@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Vault Viewer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Cg%20transform='rotate(-6%2016%2016)'%3E%3Cpath%20d='M5%205h22v15l-7%207H5z'%20fill='%23ffe066'%20stroke='%23c9a33a'%20stroke-width='1.5'/%3E%3Cpath%20d='M27%2020l-7%207v-7z'%20fill='%23e6c84f'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="/styles/shell.css">
+<link rel="stylesheet" href="/styles/board.css">
+<link rel="stylesheet" href="/styles/reader.css">
+<link rel="stylesheet" href="/styles/graph.css">
+<link rel="stylesheet" href="/styles/utilities.css">
+</head>
+<body>
+<header class="topbar">
+  <h1 class="app-title">Agent Vault</h1>
+  <div class="view-switch" aria-label="View">
+    <button id="board-view-btn" class="view-btn active" type="button" aria-pressed="true" disabled>Board</button>
+    <button id="graph-view-btn" class="view-btn" type="button" aria-pressed="false" disabled>Graph View</button>
+  </div>
+  <div id="project-dd" class="project-dd">
+    <button id="project-btn" class="project-btn" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="project-panel">
+      <span id="project-btn-label" class="project-btn-label"></span>
+      <span class="project-btn-caret" aria-hidden="true">&#9662;</span>
+    </button>
+    <div id="project-panel" class="project-panel hidden" role="listbox" aria-label="Projects"></div>
+  </div>
+  <div id="count-badges" class="count-badges"></div>
+  <div class="spacer"></div>
+  <span id="conn-dot" class="conn-dot conn-off" title="live connection"></span>
+</header>
+
+<main id="board" class="board"></main>
+<main id="graph" class="graph-view hidden" aria-label="Project concept graph"></main>
+
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <button id="modal-back" class="modal-btn hidden" aria-label="Back">&larr;</button>
+      <div class="modal-titles">
+        <h2 id="modal-title"></h2>
+        <div id="modal-path" class="modal-path"></div>
+        <div id="modal-chips" class="modal-chips"></div>
+      </div>
+      <button id="modal-close" class="modal-btn" aria-label="Close">&times;</button>
+    </div>
+    <div id="modal-body" class="modal-body markdown"></div>
+  </div>
+</div>
+
+<script src="/vendor/marked.min.js"></script>
+<script src="/scripts/selection.js"></script>
+<script src="/scripts/reader.js"></script>
+<script src="/scripts/project-picker.js"></script>
+<script src="/scripts/graph/layout.js"></script>
+<script src="/scripts/graph/interaction.js"></script>
+<script src="/scripts/graph/viewport.js"></script>
+<script src="/scripts/graph/labels.js"></script>
+<script src="/scripts/graph/schema.js"></script>
+<script src="/scripts/graph/view.js"></script>
+<script src="/scripts/app.js"></script>
+</body>
+</html>

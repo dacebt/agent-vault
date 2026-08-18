@@ -17,11 +17,12 @@ Each direct child of the containing root is an independent project bundle select
 - `.claude-plugin/plugin.json` — Claude Code manifest with inline lifecycle hooks.
 - `.codex-plugin/plugin.json` — Codex manifest with skills and hook configuration paths.
 - `hooks.json` — Codex lifecycle hooks using `${PLUGIN_ROOT}`.
-- `skills/` — twelve project-memory skills.
-- `bin/` — discovery, bootstrap, task, graph, hook, durability, validation, and migration commands.
+- `skills/` — thirteen project-memory and viewer-lifecycle skills.
+- `bin/` — discovery, bootstrap, task, graph, hook, durability, validation, migration, and viewer lifecycle commands.
 - `lib/` — SQLite task-store and hybrid graph implementation.
 - `templates/` — OKF v0.2 project concepts.
 - `reference/` — linking doctrine, SQLite schema, and task-consumer contract.
+- `viewer/` — dependency-free read-only Node server and browser client mirrored from `ebt-vault-viewer`.
 - `tests/` — OKF, task-store, migration, rollback, graph, bootstrap, and commit-link coverage.
 
 ## Hook lifecycle
@@ -38,7 +39,9 @@ PreCompact and SessionEnd use a sandboxed `codex exec` subprocess with approvals
 
 ## Skills
 
-`bootstrap`, `capture`, `decide`, `groom`, `handoff`, `journal`, `orient`, `recall`, `refresh`, `render`, `task-flow`, and `weave` are discovered from `skills/`. Installed skill commands resolve their scripts, templates, and references from the loaded Agent Vault plugin root; they do not depend on this repository’s checkout path.
+`bootstrap`, `capture`, `decide`, `groom`, `handoff`, `journal`, `orient`, `recall`, `refresh`, `render`, `task-flow`, `viewer`, and `weave` are discovered from `skills/`. Installed skill commands resolve their scripts, templates, references, and viewer runtime from the loaded Agent Vault plugin root; they do not depend on this repository’s checkout path.
+
+The `viewer` skill delegates background ownership to `bin/viewer.sh`. It keeps an agent-started server inside a persistent terminal session, reports its exact URL and state, refuses PID ownership conflicts, and stops only the process it verifies as its own. People invoking the launcher in their own terminal can use its detached `start` operation directly.
 
 ## Storage contract
 
@@ -52,4 +55,6 @@ From the repository root:
 bash plugins/agent-vault/tests/okf-v02.sh
 python3 plugins/agent-vault/tests/task-store.test.py
 python3 plugins/agent-vault/tests/task-migration.test.py
+python3 plugins/agent-vault/tests/viewer-launcher.test.py
+node --test plugins/agent-vault/viewer/test/*.test.mjs
 ```

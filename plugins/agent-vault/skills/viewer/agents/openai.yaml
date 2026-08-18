@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Vault Viewer"
+  short_description: "Run the local Agent Vault viewer."
+  default_prompt: "Use $viewer to start the Agent Vault viewer in the background and report its URL and status."

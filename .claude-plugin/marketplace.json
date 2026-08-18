@@ -1,6 +1,6 @@
 {
   "name": "agent-vault",
-  "description": "A single-plugin marketplace for Agent Vault, durable linked project memory for Claude Code and Codex.",
+  "description": "A single-plugin marketplace for Agent Vault, durable linked project memory and a local viewer for Claude Code and Codex.",
   "owner": {
     "name": "David Colon",
     "email": "38386583+Da-Colon@users.noreply.github.com"
@@ -9,7 +9,7 @@
     {
       "name": "agent-vault",
       "version": "0.10.0",
-      "description": "Durable project memory for Claude Code: linked OKF knowledge, SQLite-backed tasks, decisions, journals, handoffs, views, and quiet lifecycle hooks under ~/agent-vault.",
+      "description": "Durable project memory for Claude Code: linked OKF knowledge, SQLite-backed tasks, decisions, journals, handoffs, a local viewer, and quiet lifecycle hooks under ~/agent-vault.",
       "author": {
         "name": "David Colon"
       },
