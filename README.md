@@ -56,20 +56,20 @@ PreCompact and SessionEnd use `codex exec` for their headless transcript reconst
 
 ### Skills
 
-| Skill | Purpose |
-|---|---|
+| Skill                   | Purpose                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `agent-vault:bootstrap` | Scaffold a project bundle and extract a linked architecture/conventions spine from observable repository state. |
-| `agent-vault:capture` | Record a note, reference, decision, or explicitly requested task and wire it into the graph. |
-| `agent-vault:decide` | Capture a real architectural choice as a linked ADR. |
-| `agent-vault:groom` | Audit task, decision, handoff, and durability hygiene. |
-| `agent-vault:handoff` | Write the exact resume-point for unfinished work. |
-| `agent-vault:journal` | Append a grounded dated account of substantive work. |
-| `agent-vault:orient` | Present the project’s complete current state or a shareable status summary. |
-| `agent-vault:recall` | Answer a specific prior-work question by traversing links and backlinks. |
-| `agent-vault:refresh` | Check current-reality claims against the source repository. |
-| `agent-vault:render` | Build a browser-openable HTML view of project state. |
-| `agent-vault:task-flow` | Move SQLite-backed tasks through their lifecycle with acceptance and outcome discipline. |
-| `agent-vault:weave` | Audit and repair graph links, indexes, orphans, and stale references. |
+| `agent-vault:capture`   | Record a note, reference, decision, or explicitly requested task and wire it into the graph.                    |
+| `agent-vault:decide`    | Capture a real architectural choice as a linked ADR.                                                            |
+| `agent-vault:groom`     | Audit task, decision, handoff, and durability hygiene.                                                          |
+| `agent-vault:handoff`   | Write the exact resume-point for unfinished work.                                                               |
+| `agent-vault:journal`   | Append a grounded dated account of substantive work.                                                            |
+| `agent-vault:orient`    | Present the project’s complete current state or a shareable status summary.                                     |
+| `agent-vault:recall`    | Answer a specific prior-work question by traversing links and backlinks.                                        |
+| `agent-vault:refresh`   | Check current-reality claims against the source repository.                                                     |
+| `agent-vault:render`    | Build a browser-openable HTML view of project state.                                                            |
+| `agent-vault:task-flow` | Move SQLite-backed tasks through their lifecycle with acceptance and outcome discipline.                        |
+| `agent-vault:weave`     | Audit and repair graph links, indexes, orphans, and stale references.                                           |
 
 ## Installation
 
@@ -97,18 +97,6 @@ codex plugin add agent-vault@agent-vault
 ```
 
 Start a new Claude Code or Codex session after installation so the host loads the skills and hooks from the installed plugin.
-
-### Local development checkout
-
-```sh
-claude plugin marketplace add /absolute/path/to/agent-vault
-claude plugin install agent-vault@agent-vault
-
-codex plugin marketplace add /absolute/path/to/agent-vault
-codex plugin add agent-vault@agent-vault
-```
-
-The repository marketplace files are `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`. Both expose exactly one plugin from `./plugins/agent-vault`.
 
 ## Set up the vault root
 
