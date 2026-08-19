@@ -31,12 +31,17 @@ Distinct from `agent-vault:groom`: groom checks *task/decision/handoff lifecycle
    ```
    It reports six findings, each only when present: **ORPHANS**, **DANGLING LINKS**, **LEGACY WIKILINKS**, **MISSING INDEX**, **INDEX GAPS**, **UNLINKED MENTIONS**. It reports; it never edits.
 
-   Pass `--quick` for a fast pass — `graph-audit.sh --quick <project-path>` — when you only need orphans, dangling links, legacy wikilinks, and index health. `--quick` skips the alias-aware unlinked-mention scan (the expensive one); the full run adds it back. Either way the audit ends with a machine-readable `SUMMARY:` line.
+   Pass `--quick` for fast intermediate triage when you only need orphans, dangling links, legacy wikilinks, and index health. `--quick` skips the alias-aware unlinked-mention scan; it never substitutes for the initial or final full audit. Either mode ends with a machine-readable `SUMMARY:` line.
 3. For backlink questions while triaging ("does anything point at this orphan?"), use:
    ```
    ${AGENT_VAULT_PLUGIN_ROOT}/bin/backlinks.sh <project-path> <concept-id>
    ```
-4. Triage each finding into a concrete fix and **propose before applying** — the link graph is judgment-laden; a wrong link is worse than a missing one.
+4. If the audit has no findings, do not spawn verification subagents. If it has findings, the main agent must delegate their verification:
+   - Choose the number of subagents from the finding count, connected neighborhoods, and overlap. Assign every finding to exactly one owner; keep tightly connected findings together.
+   - Give each subagent only its assigned findings and the project path. Subagents inspect the relevant concepts read-only and return a disposition for every finding: confirmed defect, false positive, or intentional forward link; exact evidence; a proposed repair when confirmed; and any cross-partition dependency.
+   - Subagents do not run the graph audit or settle cross-partition conflicts. The main agent alone runs the initial audit gate, checks every returned disposition against the source, reconciles dependencies, and accounts for every finding.
+5. Triage the verified findings into one concrete repair proposal and **propose before applying** — the link graph is judgment-laden; a wrong link is worse than a missing one.
+6. After approval, partition the accepted repairs into non-overlapping subagent assignments. Each subagent edits only its assigned vault paths, runs the relevant focused checks, and returns its changed paths and evidence. The main agent inspects the assembled diff, resolves every overlap or cross-partition dependency, and runs the final audit gate.
 
 ## Fixing each finding
 

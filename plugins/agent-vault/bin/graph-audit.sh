@@ -11,9 +11,9 @@
 #   INDEX GAPS               a concept not listed in its directory's index.md
 #   UNLINKED MENTIONS        bare text naming an existing concept id/alias, not linked
 #
-# --quick skips ONLY the UNLINKED MENTIONS computation+section (the expensive
-# nested concept×concept loop). Every other section, and the machine-readable
-# SUMMARY line, still runs. <project-path> and --quick may appear in either order.
+# --quick skips ONLY the UNLINKED MENTIONS computation+section. Every other
+# section, and the machine-readable SUMMARY line, still runs. <project-path>
+# and --quick may appear in either order.
 #
 # Always prints, LAST, exactly one machine-readable line (both modes):
 #   SUMMARY: concepts=<n> orphans=<n> dangling=<n> legacy=<n> missing_index=<n> index_gaps=<n>
@@ -79,24 +79,6 @@ resolve_target() {
 }
 
 section() { printf '\n## %s\n' "$1"; }
-
-# Alternate display names declared in a concept's frontmatter, one per line.
-# Parses the inline YAML list form only: `aliases: [name one, name two]`.
-aliases_of() {
-  awk 'NR==1 && /^---[[:space:]]*$/ {fm=1; next}
-       fm && /^---[[:space:]]*$/ {exit}
-       fm && /^aliases:[[:space:]]*\[/ {
-         line=$0
-         sub(/^aliases:[[:space:]]*\[/, "", line)
-         sub(/\].*$/, "", line)
-         n=split(line, a, ",")
-         for (i=1; i<=n; i++) {
-           g=a[i]
-           gsub(/^[[:space:]]+/, "", g); gsub(/[[:space:]]+$/, "", g)
-           if (g != "") print g
-         }
-       }' "$1"
-}
 
 # Count findings (one per line) in an accumulator; 0 when empty.
 count_findings() { if [[ -n "$1" ]]; then printf '%s' "$1" | grep -c '^'; else echo 0; fi; }
@@ -166,61 +148,12 @@ for d in knowledge docs docs/decisions; do
 done
 
 # ---- UNLINKED MENTION CANDIDATES ----
-# A concept id appearing as bare text in ANOTHER concept's body — a missing edge.
-# Conservative heuristic (weave confirms before acting), tuned to avoid noise:
-#   - body only: frontmatter metadata is skipped
-#   - date-shaped ids skipped: journal/handoff ids are dates; bare dates are noise
-#   - ids < 6 chars skipped, and matches must be on word boundaries
-# Print only the body of a file (real line numbers preserved), frontmatter stripped.
-body_with_lineno() {
-  awk 'NR==1 && /^---[[:space:]]*$/ {fm=1; next}
-       fm && /^---[[:space:]]*$/ {fm=0; next}
-       fm {next}
-       {printf "%d: %s\n", NR, $0}' "$1"
-}
-# Alias-aware: a concept is mentioned when its id OR any of its declared aliases
-# appears bare in another concept's body. Skipped entirely under --quick.
 mentions=""
 if [[ "$quick" == "0" ]]; then
-while IFS= read -r f; do
-  rel="${f#./}"
-  id="$(basename "$rel" .md)"
-  # Search terms, one "kind|value" per line: the id (subject to the id skip
-  # rules) plus every declared alias (always searched — aliases are chosen names,
-  # not auto-derived, so they carry intent even when short).
-  terms=""
-  if [[ "${#id}" -ge 6 ]]; then
-    case "$id" in
-      [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
-      *) terms+="id|$id"$'\n' ;;
-    esac
+  mentions="$(python3 "$plugin_root/bin/unlinked-mentions.py" "$project")"
+  if [[ -n "$mentions" ]]; then
+    mentions+=$'\n'
   fi
-  while IFS= read -r al; do
-    [[ -n "$al" ]] || continue
-    terms+="alias|$al"$'\n'
-  done < <(aliases_of "$f")
-  [[ -n "$terms" ]] || continue
-  while IFS= read -r g; do
-    grel="${g#./}"
-    [[ "$grel" == "$rel" ]] && continue
-    body="$(body_with_lineno "$g")"
-    while IFS= read -r term; do
-      [[ -n "$term" ]] || continue
-      kind="${term%%|*}"; val="${term#*|}"
-      e="$(esc "$val")"
-      while IFS= read -r hit; do
-        [[ -n "$hit" ]] || continue
-        if [[ "$kind" == "alias" ]]; then
-          mentions+="- \`$grel\` $hit  (bare mention of alias \`$val\` for \`$id\` — link it?)"$'\n'
-        else
-          mentions+="- \`$grel\` $hit  (bare mention of \`$id\` — link it?)"$'\n'
-        fi
-      done < <(printf '%s\n' "$body" \
-                | grep -E "(^|[^A-Za-z0-9_-])${e}([^A-Za-z0-9_-]|\$)" 2>/dev/null \
-                | grep -vE '\]\(|\[\[' )
-    done < <(printf '%s\n' "$terms")
-  done < <("${is_concept_find[@]}" 2>/dev/null)
-done < <("${is_concept_find[@]}" 2>/dev/null | sort)
 fi
 
 # ---- emit ----

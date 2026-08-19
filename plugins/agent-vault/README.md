@@ -53,6 +53,7 @@ From the repository root:
 
 ```sh
 bash plugins/agent-vault/tests/okf-v02.sh
+python3 plugins/agent-vault/tests/graph-audit.test.py
 python3 plugins/agent-vault/tests/task-store.test.py
 python3 plugins/agent-vault/tests/task-migration.test.py
 python3 plugins/agent-vault/tests/viewer-launcher.test.py
