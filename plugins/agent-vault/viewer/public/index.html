@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/styles/board.css">
 <link rel="stylesheet" href="/styles/reader.css">
 <link rel="stylesheet" href="/styles/graph.css">
+<link rel="stylesheet" href="/styles/file-explorer.css">
 <link rel="stylesheet" href="/styles/utilities.css">
 </head>
 <body>
@@ -17,6 +18,7 @@
   <div class="view-switch" aria-label="View">
     <button id="board-view-btn" class="view-btn active" type="button" aria-pressed="true" disabled>Board</button>
     <button id="graph-view-btn" class="view-btn" type="button" aria-pressed="false" disabled>Graph View</button>
+    <button id="files-view-btn" class="view-btn" type="button" aria-pressed="false" disabled>Files</button>
   </div>
   <div id="project-dd" class="project-dd">
     <button id="project-btn" class="project-btn" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="project-panel">
@@ -32,6 +34,7 @@
 
 <main id="board" class="board"></main>
 <main id="graph" class="graph-view hidden" aria-label="Project concept graph"></main>
+<main id="files" class="files-view hidden" aria-label="Project files"></main>
 
 <div id="modal-overlay" class="modal-overlay hidden">
   <div class="modal" role="dialog" aria-modal="true">
@@ -52,6 +55,7 @@
 <script src="/scripts/selection.js"></script>
 <script src="/scripts/reader.js"></script>
 <script src="/scripts/project-picker.js"></script>
+<script src="/scripts/file-explorer.js"></script>
 <script src="/scripts/graph/layout.js"></script>
 <script src="/scripts/graph/interaction.js"></script>
 <script src="/scripts/graph/viewport.js"></script>

@@ -1,8 +1,8 @@
 # Agent Vault Viewer
 
-This directory contains the dependency-free local viewer bundled with the Agent Vault plugin. It serves the project bundles under `~/agent-vault` by default, reads SQLite task concepts without mutation, renders linked Markdown and graph data, refreshes through filesystem events, and listens only on `127.0.0.1`.
+This directory contains the dependency-free local viewer bundled with the Agent Vault plugin. It serves the project bundles under `~/agent-vault` by default, reads SQLite task concepts without mutation, renders task boards, linked Markdown, concept graphs, and physical file trees, refreshes through filesystem events, and listens only on `127.0.0.1`.
 
-The runtime is mirrored from the standalone `ebt-vault-viewer` repository. The imported baseline is upstream commit `ebe74d2`; viewer work lands and is verified there first, then is adapted to the `AGENT_VAULT` namespace and mirrored here.
+The runtime is mirrored from the standalone `ebt-vault-viewer` repository. The imported baseline is upstream commit `519d7a1`; viewer work lands and is verified there first, then is adapted to the `AGENT_VAULT` namespace and mirrored here.
 
 ## Run
 
@@ -24,6 +24,6 @@ use `start` for an ordinary detached process.
 
 - `server.mjs` is the loopback HTTP entrypoint and static-asset allowlist.
 - `src/server/` owns read-only SQLite, Markdown, path-containment, and graph projection.
-- `public/` contains the vanilla browser application.
+- `public/` contains the vanilla browser application, including the board, graph, reader, and file explorer.
 - `vendor/marked.min.js` is the browser/server Markdown parser.
 - `test/` contains Node tests over storage, API, graph, and refresh behavior.

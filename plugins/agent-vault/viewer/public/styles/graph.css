@@ -128,6 +128,7 @@
 .graph-edge {
   stroke: #9f8c68;
   stroke-linecap: round;
+  transition: stroke 150ms ease;
 }
 
 .graph-node-halo,
@@ -175,6 +176,29 @@
   stroke-width: 1.65;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transition: stroke 150ms ease, stroke-width 150ms ease;
+}
+.graph-node-shadow,
+.graph-node-mark {
+  transition: opacity 150ms ease;
+}
+.graph-node.is-active .graph-node-shadow { opacity: 0.3; }
+.graph-node.is-active .graph-node-mark { opacity: 1; }
+.graph-node.is-active .graph-node-outline {
+  stroke: rgba(99, 68, 28, 0.9);
+  stroke-width: 2;
+}
+.graph-node.is-active .graph-node-glyph {
+  stroke: #302514;
+  stroke-width: 1.8;
+}
+.graph-node.is-neighbor .graph-node-outline {
+  stroke: rgba(123, 84, 34, 0.84);
+  stroke-width: 1.6;
+}
+.graph-node.is-neighbor .graph-node-glyph { stroke: #3d2f1a; }
+.graph-edge.is-connected {
+  stroke: #7f5825;
 }
 .graph-node:focus-visible .graph-node-outline {
   stroke: #396b73;

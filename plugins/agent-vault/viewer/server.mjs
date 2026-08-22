@@ -16,6 +16,7 @@ const HOST = '127.0.0.1';
 const STATIC_FILES = {
   '/': 'public/index.html',
   '/scripts/app.js': 'public/scripts/app.js',
+  '/scripts/file-explorer.js': 'public/scripts/file-explorer.js',
   '/scripts/project-picker.js': 'public/scripts/project-picker.js',
   '/scripts/reader.js': 'public/scripts/reader.js',
   '/scripts/selection.js': 'public/scripts/selection.js',
@@ -26,6 +27,7 @@ const STATIC_FILES = {
   '/scripts/graph/schema.js': 'public/scripts/graph/schema.js',
   '/scripts/graph/view.js': 'public/scripts/graph/view.js',
   '/styles/board.css': 'public/styles/board.css',
+  '/styles/file-explorer.css': 'public/styles/file-explorer.css',
   '/styles/graph.css': 'public/styles/graph.css',
   '/styles/reader.css': 'public/styles/reader.css',
   '/styles/shell.css': 'public/styles/shell.css',
@@ -147,6 +149,14 @@ export function createViewerServer(options = {}) {
       }
     }
 
+    if (pathname === '/api/files') {
+      const project = url.searchParams.get('project');
+      if (!vaultStore.hasProject(project)) {
+        return sendJson(res, 404, { error: 'unknown project' });
+      }
+      return sendJson(res, 200, { project, entries: vaultStore.files(project) });
+    }
+
     if (pathname === '/api/task') {
       const project = url.searchParams.get('project');
       const id = url.searchParams.get('id');
@@ -171,11 +181,11 @@ export function createViewerServer(options = {}) {
       if (!vaultStore.hasProject(project)) {
         return sendJson(res, 404, { error: 'unknown project' });
       }
-      if (!docPath || !docPath.endsWith('.md')) {
+      if (!docPath || path.extname(docPath).toLowerCase() !== '.md') {
         return sendJson(res, 400, { error: 'bad path' });
       }
       const absolutePath = vaultStore.resolvePath(project, docPath);
-      if (!absolutePath || !absolutePath.endsWith('.md')) {
+      if (!absolutePath || path.extname(absolutePath).toLowerCase() !== '.md') {
         return sendJson(res, 400, { error: 'bad path' });
       }
       const document = vaultStore.document(project, docPath);
@@ -199,7 +209,7 @@ export function createViewerServer(options = {}) {
         return sendJson(res, 404, { error: 'unknown project' });
       }
       const abs = vaultStore.resolvePath(project, rawPath);
-      if (!abs || abs.endsWith('.md')) {
+      if (!abs || path.extname(abs).toLowerCase() === '.md') {
         return sendJson(res, 400, { error: 'bad path' });
       }
       let data;

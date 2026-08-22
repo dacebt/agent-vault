@@ -9,8 +9,10 @@ const els = {
   connDot: document.getElementById("conn-dot"),
   boardViewBtn: document.getElementById("board-view-btn"),
   graphViewBtn: document.getElementById("graph-view-btn"),
+  filesViewBtn: document.getElementById("files-view-btn"),
   board: document.getElementById("board"),
   graph: document.getElementById("graph"),
+  files: document.getElementById("files"),
   overlay: document.getElementById("modal-overlay"),
   modalBack: document.getElementById("modal-back"),
   modalClose: document.getElementById("modal-close"),
@@ -31,22 +33,18 @@ function esc(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[c]);
 }
-
 function hashStr(s) {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h);
 }
-
 function tiltFor(path) {
   const h = hashStr(path);
   return (((h % 100) / 100) * 5 - 2.5).toFixed(2) + "deg";
 }
-
 function prettyStatus(status) {
   return status.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
-
 function projectCounts(project) {
   return project && project.counts && typeof project.counts === "object" ? project.counts : null;
 }
@@ -57,7 +55,6 @@ function projectError(body, fallback) {
   }
   return fallback;
 }
-
 async function fetchJSON(url) {
   const res = await fetch(url, { cache: "no-store" });
   let body = null;
@@ -79,7 +76,10 @@ const reader = window.documentReader.create({
   fetchJSON,
   escapeHTML: esc,
 });
-
+const files = window.fileExplorer.create({
+  root: els.files,
+  onOpenDocument: (path) => reader.open({ kind: "document", path }),
+});
 const picker = window.projectPicker.create({
   elements: {
     wrapper: els.ddWrap,
@@ -111,22 +111,25 @@ function contentMatches(gen, project, view) {
 }
 
 function renderViewState() {
-  const boardActive = currentView === "board";
-  els.board.classList.toggle("hidden", !boardActive);
-  els.graph.classList.toggle("hidden", boardActive);
-  els.boardViewBtn.classList.toggle("active", boardActive);
-  els.graphViewBtn.classList.toggle("active", !boardActive);
-  els.boardViewBtn.setAttribute("aria-pressed", String(boardActive));
-  els.graphViewBtn.setAttribute("aria-pressed", String(!boardActive));
-  els.boardViewBtn.disabled = !currentProject;
-  els.graphViewBtn.disabled = !currentProject;
+  for (const [view, surface, button] of [
+    ["board", els.board, els.boardViewBtn], ["graph", els.graph, els.graphViewBtn],
+    ["files", els.files, els.filesViewBtn],
+  ]) {
+    const active = currentView === view;
+    surface.classList.toggle("hidden", !active);
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+    button.disabled = !currentProject;
+  }
 }
 
 function renderContentMessage(message) {
   els.board.replaceChildren();
   els.graph.replaceChildren();
-  const target = currentView === "board" ? els.board : els.graph;
-  target.innerHTML = `<div class="${currentView === "board" ? "board-note" : "graph-note"}">${esc(message)}</div>`;
+  els.files.replaceChildren();
+  const targets = { board: [els.board, "board-note"], graph: [els.graph, "graph-note"], files: [els.files, "files-note"] };
+  const [target, className] = targets[currentView];
+  target.innerHTML = `<div class="${className}">${esc(message)}</div>`;
 }
 
 async function applySelection(name, gen = contentRequest()) {
@@ -136,6 +139,7 @@ async function applySelection(name, gen = contentRequest()) {
   if (currentProject !== prevProject) {
     els.board.replaceChildren();
     els.graph.replaceChildren();
+    els.files.replaceChildren();
     if (prevProject !== null) reader.close();
   }
   picker.update(projects, currentProject);
@@ -173,6 +177,7 @@ function renderBadges() {
 
 async function loadCurrentProjection(project, view, gen) {
   if (view === "graph") await loadGraph(project, view, gen);
+  else if (view === "files") await loadFiles(project, view, gen);
   else await loadBoard(project, view, gen);
 }
 
@@ -227,8 +232,24 @@ async function loadGraph(project, view, gen) {
   });
 }
 
+async function loadFiles(project, view, gen) {
+  if (!els.files.querySelector(".files-head")) els.files.innerHTML = '<div class="files-note">Loading files…</div>';
+  const { ok, status, body } = await fetchJSON(`/api/files?project=${encodeURIComponent(project)}`);
+  if (!contentMatches(gen, project, view)) return;
+  if (!ok) {
+    const message = status === 404 ? "Unknown project." : "Could not load project files.";
+    els.files.innerHTML = `<div class="files-note">${esc(message)}</div>`;
+    return;
+  }
+  if (!window.fileExplorer.isPayload(body, project)) {
+    els.files.innerHTML = '<div class="files-note">Could not load project files.</div>';
+    return;
+  }
+  files.render(project, body.entries);
+}
+
 function setView(view) {
-  if (!currentProject || view === currentView || (view !== "board" && view !== "graph")) return;
+  if (!currentProject || view === currentView || !["board", "graph", "files"].includes(view)) return;
   const gen = contentRequest();
   currentView = view;
   renderViewState();
@@ -278,6 +299,7 @@ els.board.addEventListener("click", (e) => {
 
 els.boardViewBtn.addEventListener("click", () => setView("board"));
 els.graphViewBtn.addEventListener("click", () => setView("graph"));
+els.filesViewBtn.addEventListener("click", () => setView("files"));
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;

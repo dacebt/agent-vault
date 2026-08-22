@@ -127,7 +127,7 @@ bash plugins/agent-vault/bin/viewer.sh status
 bash plugins/agent-vault/bin/viewer.sh stop
 ```
 
-The viewer serves `http://127.0.0.1:7373` by default, reads the configured Agent Vault root, and opens SQLite task stores read-only. It has no package-install or build step. Set `AGENT_VAULT` or `PORT` before invoking the command to override the defaults.
+The viewer serves `http://127.0.0.1:7373` by default, reads the configured Agent Vault root, and presents SQLite task boards, concept graphs, linked documents, and physical file trees without mutation. It has no package-install or build step. Set `AGENT_VAULT` or `PORT` before invoking the command to override the defaults.
 
 ## Requirements
 

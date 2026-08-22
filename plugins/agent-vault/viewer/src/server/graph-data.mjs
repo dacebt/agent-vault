@@ -28,7 +28,7 @@ function discoverMarkdownFiles(projectDir) {
       if (entry.isDirectory()) {
         if (relativeDir === '' && entry.name === 'views') continue;
         visit(relativePath);
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.md') {
         files.push(relativePath);
       }
     }

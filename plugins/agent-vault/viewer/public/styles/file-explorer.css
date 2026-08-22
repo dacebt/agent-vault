@@ -1,0 +1,182 @@
+.files-view {
+  min-height: calc(100vh - 58px);
+}
+
+.files-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #d8ccae;
+  background: #fffdf6;
+}
+
+.files-titles { min-width: 0; flex: 1; }
+.files-title { margin: 0; font-size: 0.92rem; }
+.files-path {
+  color: #81765e;
+  font: 0.75rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.file-layout-switch {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #d8ccae;
+  border-radius: 7px;
+  background: #f1ead6;
+}
+
+.file-layout-button {
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 5px;
+  color: #81765e;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+.file-layout-button:hover { background: rgba(255, 255, 255, 0.58); }
+.file-layout-button.active {
+  color: #3b3428;
+  background: #fffdf6;
+  box-shadow: 0 1px 3px rgba(70, 51, 18, 0.14);
+}
+
+.files-content {
+  min-height: calc(100vh - 119px);
+  background:
+    radial-gradient(circle at 30% 0, rgba(255,255,255,0.8), transparent 42%),
+    #f6f0df;
+}
+.file-layout-panel[hidden] { display: none; }
+
+.file-tree-content { padding: 20px; }
+.file-tree-card {
+  min-height: calc(100vh - 159px);
+  padding: 16px;
+  border: 1px solid #d8ccae;
+  border-radius: 9px;
+  background: rgba(255, 253, 246, 0.82);
+}
+.file-tree-directory { margin-left: 17px; }
+.file-tree-root { margin-left: 0; }
+.file-tree-summary {
+  width: fit-content;
+  padding: 3px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.file-tree-summary:hover { background: #f1ead6; }
+.file-tree-summary::marker { color: #9b7c3d; }
+.file-tree-file {
+  display: block;
+  width: calc(100% - 18px);
+  margin: 2px 0 2px 18px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 5px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+}
+.file-tree-file:hover,
+.file-tree-file:focus-visible,
+.file-tree-file.selected {
+  background: #ffe89a;
+  outline: none;
+}
+.file-tree-file-icon {
+  display: inline-block;
+  width: 22px;
+  color: #a0622a;
+}
+.files-status {
+  min-height: 35px;
+  margin: 13px 0 0;
+  padding: 8px 10px;
+  border-top: 1px solid #e6dcc4;
+  color: #81765e;
+  font-size: 0.78rem;
+}
+
+.file-browser:not([hidden]) {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: calc(100vh - 119px);
+}
+.file-browser-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #d8ccae;
+}
+.file-browser-back {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d8ccae;
+  border-radius: 6px;
+  color: inherit;
+  background: #fffdf6;
+  cursor: pointer;
+  font: inherit;
+}
+.file-browser-back:disabled { opacity: 0.38; cursor: default; }
+.file-browser-breadcrumb {
+  min-width: 0;
+  overflow: hidden;
+  color: #81765e;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-browser-grid {
+  align-content: start;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+  gap: 12px;
+  padding: 20px;
+}
+.file-browser-item {
+  min-height: 112px;
+  padding: 13px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+}
+.file-browser-item:hover,
+.file-browser-item:focus-visible {
+  border-color: #d8ccae;
+  background: rgba(255, 253, 246, 0.8);
+  outline: none;
+}
+.file-browser-item.selected { border-color: #c49c47; background: #fff4be; }
+.file-browser-item-icon { display: block; margin-bottom: 6px; font-size: 2.2rem; line-height: 1; }
+.file-browser-item-name { display: block; overflow-wrap: anywhere; font-size: 0.84rem; font-weight: 650; }
+.file-browser-item-meta { display: block; margin-top: 4px; color: #81765e; font-size: 0.7rem; }
+.file-browser-footer {
+  min-height: 55px;
+  padding: 10px 20px;
+  border-top: 1px solid #d8ccae;
+  background: rgba(255, 253, 246, 0.72);
+}
+.file-browser-footer strong { display: block; font-size: 0.8rem; }
+
+.files-note { padding: 40px 24px; color: #7a6f58; font-size: 0.95rem; }
+
+@media (max-width: 570px) {
+  .files-head { align-items: flex-start; }
+  .file-layout-button { padding-inline: 7px; }
+  .file-browser-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

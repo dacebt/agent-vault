@@ -78,6 +78,11 @@ async function getJson(request, pathname) {
 test('projects, board, task reads, and markdown containment follow the SQLite contract', (t) => {
   const { dbPath, projectDir, projectName, vaultRoot } = createValidSqliteProject(t);
   fs.chmodSync(dbPath, 0o444);
+  const uppercaseMarkdownPath = path.join(projectDir, 'knowledge', 'UPPER.MD');
+  fs.writeFileSync(uppercaseMarkdownPath, '# Uppercase Markdown\n');
+  const outsideFile = path.join(vaultRoot, 'outside.txt');
+  fs.writeFileSync(outsideFile, 'outside');
+  fs.symlinkSync(outsideFile, path.join(projectDir, 'escaped.txt'));
 
   const store = createVaultStore(vaultRoot);
   assert.equal(store.isUsable(), true);
@@ -120,12 +125,32 @@ test('projects, board, task reads, and markdown containment follow the SQLite co
     fs.realpathSync(path.join(projectDir, documentPath)),
   );
   assert.match(store.document(projectName, documentPath).markdown, /Viewer context/);
+  assert.match(store.document(projectName, 'knowledge/UPPER.MD').markdown, /Uppercase Markdown/);
   assert.equal(store.resolvePath(projectName, '../outside.md'), null);
   assert.equal(store.resolvePath(projectName, '..\\outside.md'), null);
   assert.equal(
     store.resolvePath(projectName, 'artifacts/preview.svg'),
     fs.realpathSync(path.join(projectDir, 'artifacts', 'preview.svg')),
   );
+
+  const files = store.files(projectName);
+  assert.deepEqual(files.map((entry) => [entry.kind, entry.name]), [
+    ['directory', 'artifacts'],
+    ['directory', 'knowledge'],
+    ['directory', 'tasks'],
+    ['directory', 'views'],
+    ['file', 'index.md'],
+  ]);
+  assert.deepEqual(files.find((entry) => entry.name === 'views')?.children, [
+    {
+      kind: 'file',
+      name: 'ignored.md',
+      path: '/views/ignored.md',
+      size: fs.statSync(path.join(projectDir, 'views', 'ignored.md')).size,
+    },
+  ]);
+  assert.equal(files.some((entry) => entry.name === '.hidden'), false);
+  assert.equal(files.some((entry) => entry.name === 'escaped.txt'), false);
 });
 
 test('database validation failures surface as structured project errors', (t) => {
@@ -209,6 +234,7 @@ test('database validation failures surface as structured project errors', (t) =>
 
 test('HTTP endpoints preserve status contracts for valid, malformed, absent, and broken databases', async (t) => {
   const { projectDir, projectName, vaultRoot } = createValidSqliteProject(t);
+  fs.writeFileSync(path.join(projectDir, 'knowledge', 'UPPER.MD'), '# Uppercase Markdown\n');
   createProject(vaultRoot, 'missing-db');
   const invalidTitleDir = createProject(vaultRoot, 'invalid-title');
   createSqliteDatabase(path.join(invalidTitleDir, 'tasks', 'tasks.sqlite3'), {
@@ -242,9 +268,19 @@ test('HTTP endpoints preserve status contracts for valid, malformed, absent, and
 
     const graph = await getJson(request, `/api/graph?project=${projectName}`);
     assert.equal(graph.status, 200);
-    assert.equal(graph.json.nodes.length, 8);
+    assert.equal(graph.json.nodes.length, 9);
     assert.equal(graph.json.edges.length > 0, true);
     assert.deepEqual(graph.json.errors, []);
+    assert.equal(graph.json.nodes.some((node) => node.id === '/knowledge/UPPER.MD'), true);
+
+    const files = await getJson(request, `/api/files?project=${projectName}`);
+    assert.equal(files.status, 200);
+    assert.equal(files.json.project, projectName);
+    assert.equal(files.json.entries.some((entry) => entry.name === 'views'), true);
+
+    const unknownFiles = await getJson(request, '/api/files?project=unknown');
+    assert.equal(unknownFiles.status, 404);
+    assert.equal(unknownFiles.json.error, 'unknown project');
 
     const graphFailure = await getJson(request, '/api/graph?project=missing-db');
     assert.equal(graphFailure.status, 422);
@@ -311,6 +347,13 @@ test('HTTP endpoints preserve status contracts for valid, malformed, absent, and
     assert.equal(doc.status, 200);
     assert.match(doc.json.markdown, /Viewer context/);
 
+    const uppercaseDoc = await getJson(
+      request,
+      `/api/doc?project=${projectName}&path=${encodeURIComponent('knowledge/UPPER.MD')}`,
+    );
+    assert.equal(uppercaseDoc.status, 200);
+    assert.match(uppercaseDoc.json.markdown, /Uppercase Markdown/);
+
     const badDoc = await getJson(
       request,
       `/api/doc?project=${projectName}&path=${encodeURIComponent('../outside.md')}`,
@@ -321,6 +364,13 @@ test('HTTP endpoints preserve status contracts for valid, malformed, absent, and
     const raw = await request(`/raw/${projectName}/${encodeURIComponent('artifacts/preview.svg')}`);
     assert.equal(raw.status, 200);
     assert.match(raw.body, /<svg/);
+
+    const uppercaseRaw = await getJson(
+      request,
+      `/raw/${projectName}/${encodeURIComponent('knowledge/UPPER.MD')}`,
+    );
+    assert.equal(uppercaseRaw.status, 400);
+    assert.equal(uppercaseRaw.json.error, 'bad path');
 
     const rawTraversal = await getJson(request, `/raw/${projectName}/${encodeURIComponent('../secret.txt')}`);
     assert.equal(rawTraversal.status, 400);

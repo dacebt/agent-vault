@@ -33,6 +33,11 @@ function createProjectError(error) {
   throw error;
 }
 
+function compareFileEntries(left, right) {
+  if (left.kind !== right.kind) return left.kind === 'directory' ? -1 : 1;
+  return left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
+}
+
 export function createVaultStore(vault) {
   function vaultIdentity() {
     const canonical = canonicalDirectory(vault);
@@ -165,6 +170,52 @@ export function createVaultStore(vault) {
     return buildProjectGraph(project.projectDir, parseFrontmatter, projectTasks(project));
   }
 
+  function files(projectName) {
+    const project = projectIdentity(projectName);
+    if (!project) return [];
+
+    function visit(relativeDirectory, ancestors) {
+      const directory = relativeDirectory
+        ? resolvePath(projectName, relativeDirectory)
+        : project.projectDir;
+      if (!directory) return [];
+
+      return fs.readdirSync(directory, { withFileTypes: true })
+        .filter((entry) => !entry.name.startsWith('.'))
+        .map((entry) => {
+          const relativePath = path.join(relativeDirectory, entry.name);
+          const absolutePath = resolvePath(projectName, relativePath);
+          if (!absolutePath) return null;
+
+          let stats;
+          try {
+            stats = fs.statSync(absolutePath);
+          } catch {
+            return null;
+          }
+
+          const filePath = '/' + relativePath.split(path.sep).join('/');
+          if (stats.isFile()) {
+            return { kind: 'file', name: entry.name, path: filePath, size: stats.size };
+          }
+          if (!stats.isDirectory() || ancestors.has(absolutePath)) return null;
+
+          const nextAncestors = new Set(ancestors);
+          nextAncestors.add(absolutePath);
+          return {
+            kind: 'directory',
+            name: entry.name,
+            path: filePath,
+            children: visit(relativePath, nextAncestors),
+          };
+        })
+        .filter(Boolean)
+        .sort(compareFileEntries);
+    }
+
+    return visit('', new Set([project.projectDir]));
+  }
+
   function resolvePath(projectName, requested) {
     const project = projectIdentity(projectName);
     if (!project || typeof requested !== 'string' || requested.includes('\0')) return null;
@@ -211,7 +262,7 @@ export function createVaultStore(vault) {
 
   function document(project, documentPath) {
     const absolutePath = resolvePath(project, documentPath);
-    if (!absolutePath || !absolutePath.endsWith('.md')) return null;
+    if (!absolutePath || path.extname(absolutePath).toLowerCase() !== '.md') return null;
     let markdown;
     try {
       markdown = fs.readFileSync(absolutePath, 'utf8');
@@ -229,6 +280,7 @@ export function createVaultStore(vault) {
   return Object.freeze({
     board,
     document,
+    files,
     graph,
     hasProject,
     isUsable,
