@@ -1,6 +1,6 @@
 {
   "name": "agent-vault",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Project-memory skills, quiet hooks, and a local read-only viewer over OKF bundles with SQLite tasks.",
   "author": {
     "name": "David Colon",

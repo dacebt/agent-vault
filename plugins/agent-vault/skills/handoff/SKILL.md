@@ -38,12 +38,12 @@ You may write both in one wrap-up: the journal records the narrative, the handof
 
 Context loss doesn't only happen at the end of a session — it happens **mid-session every time the conversation is compacted**, manually via `/compact` or automatically when the context window fills. That auto-compaction is exactly the moment a handoff is most valuable and least likely to be remembered, because no one chose to stop.
 
-The plugin handles this with a **PreCompact hook** (`bin/hook-precompact-handoff.sh`, wired in `.claude-plugin/plugin.json` for Claude Code and `hooks.json` for Codex). A PreCompact hook gets no follow-up agent turn, so it can't ask the running agent to write a handoff — there's no turn left to act on a reminder. Instead it spawns a **headless `codex exec`** that:
+The plugin handles this with a **PreCompact hook** (`bin/hook-precompact-handoff.sh`, wired in `.claude-plugin/plugin.json` for Claude Code and `hooks.json` for Codex). A PreCompact hook gets no follow-up agent turn, so it can't ask the running agent to write a handoff — there's no turn left to act on a reminder. Instead its shell wrapper:
 
-1. Reconstructs the session from the transcript on disk (it has no in-session memory — it reads the recent tail of `transcript_path`).
-2. Runs this skill against that reconstruction, following the same discipline below — including *writing nothing* if nothing is genuinely in flight.
+1. Gives a read-only, low-reasoning `codex exec` only the newest 512 KiB of transcript as untrusted evidence.
+2. Receives structured handoff content or an explicit skip, validates it, then deterministically renders, supersedes, and commits the handoff.
 
-It runs synchronously, so compaction blocks until the handoff is written from the full pre-compaction transcript (a handoff produced after the context is gone would have nothing to describe). The result lands in `handoffs/` like any other handoff and surfaces as the resume-point at the next SessionStart.
+It runs synchronously, so compaction blocks until the handoff is written from the bounded pre-compaction tail (a handoff produced after the context is gone would have nothing to describe). The result lands in `handoffs/` like any other handoff and surfaces as the resume-point at the next SessionStart. Timing, subprocess errors, and the final disposition are retained under `${TMPDIR:-/tmp}/agent-vault-cache/precompact-*.log`.
 
 Two consequences for you, the agent, to keep in mind:
 

@@ -35,7 +35,7 @@ Each direct child of the containing root is an independent project bundle select
 | `PreCompact` | Synchronously reconstruct unfinished work and write a handoff. |
 | `SessionEnd` | Detach a transcript capture that journals substantive work and writes a handoff only when needed. |
 
-PreCompact and SessionEnd use a sandboxed `codex exec` subprocess with approvals and network access disabled. They silently no-op when Codex, `jq`, a readable transcript, or a tracked project is unavailable.
+PreCompact gives a read-only `codex exec` only the newest 512 KiB of transcript at low reasoning and verbosity. The shell wrapper validates its structured result, then renders, supersedes, and commits the handoff while retaining diagnostics under `${TMPDIR:-/tmp}/agent-vault-cache/precompact-*.log`. SessionEnd keeps its detached capture path. Both silently no-op when Codex, `jq`, a readable transcript, or a tracked project is unavailable.
 
 ## Skills
 
