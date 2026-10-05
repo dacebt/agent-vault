@@ -20,12 +20,24 @@ command -v jq >/dev/null 2>&1 || exit 0
 input="$(cat)"
 [[ -n "$input" ]] || exit 0
 
-prompt="$(echo "$input" | jq -r '.prompt // .user_prompt // empty' 2>/dev/null)"
+if ! printf '%s' "$input" | jq -e 'type == "object"' >/dev/null 2>&1; then
+  echo 'agent-vault wrapup: hook input must be a JSON object' >&2
+  exit 1
+fi
+
+cwd_key="$(printf '%s' "$input" | jq -r 'if has("cwd") then "cwd" elif has("current_working_directory") then "current_working_directory" else empty end')"
+if [[ -n "$cwd_key" ]]; then
+  cwd="$(printf '%s' "$input" | jq -r --arg key "$cwd_key" '.[$key] | if type == "string" then . else empty end')"
+  [[ "$cwd" == /* && -d "$cwd" ]] || exit 0
+  cd "$cwd" 2>/dev/null || exit 0
+fi
+
+prompt="$(printf '%s' "$input" | jq -r '.prompt // .user_prompt // empty | if type == "string" then . else empty end')"
 [[ -n "$prompt" ]] || exit 0
 
 # Tight wrap-up match, keyed on the two roots the user actually types:
 # "wrap up" and "end … session".
-echo "$prompt" | grep -qiE \
+printf '%s\n' "$prompt" | grep -qiE \
   "wrap[[:space:]-]*up( the)?( session)?|(end|ending|end of) (the )?session" \
   || exit 0
 
@@ -35,7 +47,7 @@ project_path="$("$PLUGIN_ROOT/bin/resolve-project.sh" "$vault" 2>/dev/null)" || 
 [[ -d "$project_path" ]] || exit 0
 
 read -r -d '' reminder <<'EOF' || true
-The user may be wrapping up this session. If substantive work landed that future-you would want to recall, consider recording it with the agent-vault:journal skill — but only if there is something real worth keeping. Not every session warrants an entry, and being reminded is not itself a reason to write one; an orientation-only or no-decision session should produce no journal entry.
+The user may be wrapping up this session. Consider the agent-vault:journal skill for substantive work, findings, or outcomes worth preserving. Let that skill judge whether an entry is useful; a reminder alone is not a reason to write one. Continue to follow the user's actual request.
 EOF
 
 jq -n --arg ctx "$reminder" '{

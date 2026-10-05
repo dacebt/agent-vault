@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${PLUGIN_ROOT}/bin/hook-session-start.sh",
+            "command": "bash \"${PLUGIN_ROOT}/bin/hook-session-start.sh\"",
             "statusMessage": "Orienting from Agent Vault"
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${PLUGIN_ROOT}/bin/hook-git-commit-link.sh"
+            "command": "bash \"${PLUGIN_ROOT}/bin/hook-git-commit-link.sh\""
           }
         ]
       }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${PLUGIN_ROOT}/bin/hook-user-prompt-wrapup.sh"
+            "command": "bash \"${PLUGIN_ROOT}/bin/hook-user-prompt-wrapup.sh\""
           }
         ]
       }
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${PLUGIN_ROOT}/bin/hook-precompact-handoff.sh",
+            "command": "bash \"${PLUGIN_ROOT}/bin/hook-precompact-handoff.sh\"",
             "statusMessage": "Writing pre-compaction handoff to Agent Vault",
             "timeout": 300
           }
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${PLUGIN_ROOT}/bin/hook-sessionend-capture.sh",
+            "command": "bash \"${PLUGIN_ROOT}/bin/hook-sessionend-capture.sh\"",
             "statusMessage": "Capturing session to Agent Vault",
             "timeout": 3
           }

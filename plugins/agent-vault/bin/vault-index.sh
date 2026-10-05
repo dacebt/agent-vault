@@ -4,9 +4,8 @@
 # Usage: vault-index.sh <project-path> [--preamble|--full]
 #
 # Modes:
-#   --preamble  Compact orientation block intended for SessionStart context injection.
-#               Names in-progress tasks, counts the kanban, surfaces the last journal
-#               entry and last decision. Token-budget conscious.
+#   --preamble  Read-only resource map with a journal excerpt and recent handoff
+#               references for SessionStart; does not query tasks or audit the graph.
 #   --full      Verbose listing for the agent-vault:orient skill. All statuses listed,
 #               with mtime per task, plus recent journal entries and recent decisions.
 
@@ -27,27 +26,6 @@ project_name="$(basename "$project_path")"
 # Portable mtime in YYYY-MM-DD (BSD stat on mac, GNU stat on linux).
 mtime() {
   stat -f '%Sm' -t '%Y-%m-%d' "$1" 2>/dev/null || stat -c '%y' "$1" 2>/dev/null | cut -d' ' -f1
-}
-
-# OKF reserved files (index.md / log.md) are not concepts — exclude them from all
-# concept counts and listings, or the preamble miscounts notes and surfaces a MOC
-# as the "last decision".
-count_md() {
-  local dir="$1"
-  if [[ -d "$dir" ]]; then
-    find "$dir" -maxdepth 1 -name '*.md' -type f ! -name 'index.md' ! -name 'log.md' 2>/dev/null | wc -l | tr -d ' '
-  else
-    echo 0
-  fi
-}
-
-count_recent_md() {
-  local dir="$1" days="$2"
-  if [[ -d "$dir" ]]; then
-    find "$dir" -maxdepth 1 -name '*.md' -type f ! -name 'index.md' ! -name 'log.md' -mtime "-$days" 2>/dev/null | wc -l | tr -d ' '
-  else
-    echo 0
-  fi
 }
 
 # SQLite-backed tasks as JSON. A missing or invalid database is a broken project
@@ -156,137 +134,78 @@ age_days() {
   echo $(( ( $(date +%s) - m ) / 86400 ))
 }
 
-# First task a handoff links that is now done — the strongest
-# "this resume-point is spent" signal. Parses both OKF-native markdown links
-# ([text](/tasks/.../id.md)) and legacy [[wikilinks]] so it keeps working
-# across the migration.
-linked_done_task() {
-  local f="$1" uri task
-  grep -oE 'task:[0-9a-fA-F-]{36}' "$f" 2>/dev/null | while IFS= read -r uri; do
-    [[ -n "$uri" ]] || continue
-    task="$(python3 "$task_db" show "$project_path" "$uri" 2>/dev/null)" || continue
-    if [[ "$(printf '%s' "$task" | jq -r '.task_status')" == "done" ]]; then
-      printf '%s\n' "$(printf '%s' "$task" | jq -r '.task_key')"
-      break
-    fi
-  done
-  return 0
+recent_excerpt() {
+  local file="$1" limit="$2" excerpt
+  excerpt="$(fm_field "$file" description)"
+  if [[ -z "$excerpt" ]]; then
+    excerpt="$(awk '
+      NR == 1 && /^---[[:space:]]*$/ { fm = 1; next }
+      fm && /^---[[:space:]]*$/ { fm = 0; next }
+      fm { next }
+      /^#/ || /^---/ || !/[^[:space:]]/ { if (seen) exit; next }
+      { printf "%s%s", (seen ? " " : ""), $0; seen=1 }
+    ' "$file")"
+  fi
+  excerpt="$(printf '%s' "$excerpt" | tr '\n\r\t' '   ')"
+  if (( ${#excerpt} > limit )); then
+    printf '%s…' "${excerpt:0:limit}"
+  else
+    printf '%s' "$excerpt"
+  fi
 }
 
 emit_preamble() {
-  local bk td ip done7
-  bk="$(task_count backlog)"
-  td="$(task_count todo)"
-  ip="$(task_count in-progress)"
-  done7="$(recent_done_count 7)"
-
-  echo "**Agent Vault online** — project \`$project_name\`"
-  echo "Path: $project_path"
+  local plugin_root route purpose last_journal excerpt
+  plugin_root="$(cd "$(dirname "$0")/.." && pwd)"
+  echo "Project vault: $project_name"
+  echo "Root: $project_path"
   echo
-
-  if [[ "$ip" != "0" ]]; then
-    echo "In-progress ($ip):"
-    task_lines in-progress | while IFS=$'\t' read -r touched id title status; do
-      label=""; [[ "$status" == "blocked" ]] && label=" [blocked]"
-      echo "- \`$id\`${label} — ${title:-(no title)} (touched $touched)"
-    done
-    echo
+  echo "Where to find information — paths relative to the vault root:"
+  if [[ -f "$knowledge_dir/index.md" ]]; then
+    echo "- knowledge/index.md — project knowledge and topic navigation"
+  elif [[ -d "$knowledge_dir" ]]; then
+    echo "- knowledge/ — project knowledge and topic notes"
   fi
+  for route in docs/decisions journal handoffs; do
+    [[ -d "$project_path/$route" ]] || continue
+    case "$route" in
+      docs/decisions) purpose="recorded choices and their rationale" ;;
+      journal) purpose="dated history of work, findings, and outcomes" ;;
+      handoffs) purpose="unfinished-work context and resume points" ;;
+    esac
+    echo "- $route/ — $purpose"
+  done
+  echo "- $plugin_root/reference/task-commands.md — finding, creating, editing, and moving tasks"
 
-  # Handoff index: name + description one-liners, not pre-loaded content. The
-  # agent decides which (if any) handoff is the live resume-point and reads it
-  # in full via agent-vault:handoff. Spent handoffs are excluded; staleness signals
-  # (age, closed linked task) are surfaced so a dead resume-point isn't trusted
-  # just for being newest.
-  if [[ -d "$handoffs_dir" ]]; then
-    local hlines="" shown=0 f
-    while IFS= read -r f; do
-      [[ -n "$f" ]] || continue
-      (( shown >= 3 )) && break
-      [[ "$(handoff_state "$f")" == "spent" ]] && continue
-      local hname hdesc hsess hage flags=""
-      hname="$(basename "$f" .md)"
-      hdesc="$(fm_field "$f" description)"
-      [[ -n "$hdesc" ]] || hdesc="$(body_snippet "$f" | head -c 120)"
-      hsess="$(fm_field "$f" session | cut -c1-8)"
-      hage="$(age_days "$f")"
-      (( hage > 14 )) && flags=", stale?"
-      local done_task
-      done_task="$(linked_done_task "$f")"
-      if [[ -n "$done_task" ]]; then
-        # Strongest spent-signal: this still-live handoff links a task now done.
-        # Flip it to spent now (surgical, file preserved) so it stops surfacing after this
-        # session — then show it once here with the action taken. Only this closed-task
-        # case auto-marks; age-only staleness (below) stays a flag, since it's weaker.
-        if "$(dirname "$0")/mark-handoff-spent.sh" "$project_path" "$hname" >/dev/null 2>&1; then
-          flags="$flags, task \`$done_task\` closed — marked spent"
-        else
-          flags="$flags, task \`$done_task\` closed — upgrade/repair required before marking spent"
-        fi
-      fi
-      hlines+="- \`$hname\` (${hsess:-session?}, ${hage}d old${flags}) — ${hdesc:-(no description)}"$'\n'
-      shown=$((shown + 1))
-    done < <(find "$handoffs_dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null | sort -r)
-    if [[ -n "$hlines" ]]; then
-      echo "Handoffs — unfinished-work resume-points, newest first. Index only; read the relevant one in full (agent-vault:handoff) and verify against current state before acting:"
-      printf '%s' "$hlines"
+  if [[ -d "$journal_dir" ]]; then
+    last_journal="$(find "$journal_dir" -maxdepth 1 -name '*.md' -type f ! -name 'index.md' ! -name 'log.md' | sort -r | head -1)"
+    if [[ -n "$last_journal" ]]; then
       echo
+      echo "Latest journal: journal/$(basename "$last_journal")"
+      excerpt="$(recent_excerpt "$last_journal" 400)"
+      [[ -z "$excerpt" ]] || printf '%s\n' "$excerpt"
     fi
   fi
 
-  echo "Backlog: $bk  •  Todo: $td  •  Done last 7d: $done7"
-
-  local kn
-  kn="$(count_md "$knowledge_dir")"
-  if [[ "$kn" != "0" ]]; then
-    local knames
-    knames="$("$(dirname "$0")/list-newest.sh" "$knowledge_dir" 2>/dev/null | head -6 \
-      | while IFS= read -r f; do printf '%s ' "\`$(basename "$f" .md)\`"; done)"
-    echo "Knowledge: $kn note$([[ "$kn" == "1" ]] || echo s) — ${knames%% }"
-  fi
-
-  local last_journal
-  last_journal="$(find "$journal_dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null | sort -r | head -1)"
-  if [[ -n "$last_journal" ]]; then
-    local jdate jsnip
-    jdate="$(basename "$last_journal" .md)"
-    jsnip="$(awk '!/^#/ && !/^---/ && /[^[:space:]]/ { print; exit }' "$last_journal" 2>/dev/null | head -c 100)"
-    echo "Last journal: $jdate — ${jsnip:-(empty)}"
-  fi
-
-  local last_decision
-  last_decision="$(find "$decisions_dir" -maxdepth 1 -name '*.md' -type f ! -name 'index.md' ! -name 'log.md' 2>/dev/null | sort -r | head -1)"
-  if [[ -n "$last_decision" ]]; then
-    local dname dtitle
-    dname="$(basename "$last_decision" .md)"
-    dtitle="$(task_title "$last_decision")"
-    echo "Last decision: $dname — ${dtitle:-(untitled)}"
-  fi
-
-  # Graph health signal: run the sibling auditor in --quick mode (skips the
-  # expensive unlinked-mentions scan) and read its machine-readable SUMMARY line.
-  # Emit a single nudge ONLY when there's something to fix — orphans, dangling
-  # links, or legacy links — keeping the preamble lean (ADR-005). Fail silent on
-  # any error so a missing/broken auditor never breaks SessionStart.
-  local graph_summary
-  graph_summary="$("$(dirname "$0")/graph-audit.sh" --quick "$project_path" 2>/dev/null | grep '^SUMMARY:' | head -1)" || true
-  if [[ -n "$graph_summary" ]]; then
-    local g_concepts g_orphans g_dangling g_legacy
-    g_concepts="$(echo "$graph_summary" | sed -E 's/.*concepts=([0-9]+).*/\1/')"
-    g_orphans="$(echo "$graph_summary" | sed -E 's/.*orphans=([0-9]+).*/\1/')"
-    g_dangling="$(echo "$graph_summary" | sed -E 's/.*dangling=([0-9]+).*/\1/')"
-    g_legacy="$(echo "$graph_summary" | sed -E 's/.*legacy=([0-9]+).*/\1/')"
-    # Guard against non-numeric extraction (malformed SUMMARY) before arithmetic
-    # AND before interpolating g_concepts into the emitted line.
-    if [[ "$g_concepts" =~ ^[0-9]+$ ]] && [[ "$g_orphans" =~ ^[0-9]+$ ]] && [[ "$g_dangling" =~ ^[0-9]+$ ]] && [[ "$g_legacy" =~ ^[0-9]+$ ]]; then
-      if (( g_orphans + g_dangling + g_legacy > 0 )); then
-        echo "Graph: ${g_concepts} concepts · ${g_orphans} orphan(s) · ${g_dangling} dangling · ${g_legacy} legacy-link(s) — run agent-vault:weave"
+  if [[ -d "$handoffs_dir" ]]; then
+    local shown=0 file
+    while IFS= read -r file; do
+      [[ "$(handoff_state "$file")" == "spent" ]] && continue
+      if (( shown == 0 )); then
+        echo
+        echo "Recent handoffs:"
       fi
-    fi
+      excerpt="$(recent_excerpt "$file" 200)"
+      printf -- '- handoffs/%s' "$(basename "$file")"
+      [[ -z "$excerpt" ]] || printf ' — %s' "$excerpt"
+      printf '\n'
+      shown=$((shown + 1))
+      (( shown < 3 )) || break
+    done < <(find "$handoffs_dir" -maxdepth 1 -name '*.md' -type f ! -name 'index.md' ! -name 'log.md' | sort -r)
   fi
 
   echo
-  echo "Knowledge layer is yours to maintain silently — when the user says \"update the project docs\" or mentions something worth recording, write to knowledge/, docs/, decisions/, or journal/ from observation; do not interview the user about layers."
+  echo "Use these references when relevant to the current request. Recent records provide continuity; verify their current relevance before treating them as work to resume."
 }
 
 emit_full() {

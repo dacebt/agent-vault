@@ -28,10 +28,8 @@ Each tracked project combines OKF v0.2 Markdown concepts with a SQLite task stor
     │       └── ADR-NNN-<decision>.md
     ├── journal/
     │   └── YYYY-MM-DD.md
-    ├── handoffs/
-    │   └── YYYY-MM-DD-HHMM.md
-    └── views/
-        └── <view-name>/index.html
+    └── handoffs/
+        └── YYYY-MM-DD-HHMM.md
 ```
 
 Markdown is authoritative for knowledge, decisions, documentation, journals, and handoffs. `tasks/tasks.sqlite3` is authoritative for task concepts. File concepts use bundle-relative Markdown links; tasks use immutable `task:<uuid>` links. Both providers form one traversable graph.
@@ -44,13 +42,15 @@ Agent Vault combines explicit skills with quiet lifecycle automation.
 
 ### Lifecycle hooks
 
-- **SessionStart** resolves the current project and injects a compact orientation: active tasks, counts, live handoffs, recent knowledge, journal and decision activity, and graph health.
-- **PostToolUse** notices a newly created Git commit and appends its short SHA and subject to the most recently touched active task.
+- **SessionStart** resolves the current project and injects a read-only resource map, a bounded recent journal excerpt, and up to three live handoff references. It does not query tasks, audit the graph, or retire records.
+- **PostToolUse** verifies receipts from explicit Git commit commands, appends each commit to the most recently touched in-progress or blocked task, and verifies the recorded database matches its committed blob. Retries preserve existing associations.
 - **UserPromptSubmit** recognizes explicit wrap-up language and reminds the agent that journaling is available without forcing a journal entry.
-- **PreCompact** reconstructs the recent transcript in a sandboxed headless run and writes a handoff only when work is genuinely unfinished.
-- **SessionEnd** starts a detached, sandboxed capture that journals substantive work and adds a handoff only when something remains in flight.
+- **PreCompact** analyzes the newest 512 KiB of transcript read-only, validates structured output, and publishes a handoff without overwriting an existing record. The wrapper supersedes selected prior handoffs for the same unit, commits the changes, and retires its analysis process group on completion or cancellation.
+- **SessionEnd** starts a supervised, detached capture that journals substantive work and adds a handoff only when something remains in flight, attributed to the original session. Its supervisor enforces a 300-second deadline and retires the writer process group on exit, timeout, or cancellation.
 
-Every hook silently exits when the containing root is absent, the current project has not been bootstrapped, required tooling is unavailable, or there is nothing meaningful to do.
+Hooks skip untracked projects and capture paths skip missing prerequisites. Invalid events or failed durability can emit diagnostics; a hook launch or command exit alone does not prove a record was written or committed. PreCompact and SessionEnd skip an unavailable event working directory instead of falling back to an inherited project.
+
+Capture diagnostics live under `${TMPDIR:-/tmp}/agent-vault-cache/precompact-*.log` and `sessionend-*.log`. For cancellation and attribution details, see [automatic handoffs](plugins/agent-vault/skills/handoff/references/automatic-handoffs.md).
 
 PreCompact and SessionEnd use `codex exec` for their headless transcript reconstruction, including when Agent Vault is installed in Claude Code. Without the `codex` CLI on `PATH`, those two captures no-op; the remaining skills and hooks continue to work.
 
@@ -63,10 +63,9 @@ PreCompact and SessionEnd use `codex exec` for their headless transcript reconst
 | `agent-vault:groom`     | Audit task, decision, handoff, and durability hygiene.                                                          |
 | `agent-vault:handoff`   | Write the exact resume-point for unfinished work.                                                               |
 | `agent-vault:journal`   | Append a grounded dated account of substantive work.                                                            |
-| `agent-vault:orient`    | Present the project’s complete current state or a shareable status summary.                                     |
+| `agent-vault:orient`    | Summarize recorded project state read-only or prepare a shareable status report.                                     |
 | `agent-vault:recall`    | Answer a specific prior-work question by traversing links and backlinks.                                        |
 | `agent-vault:refresh`   | Check current-reality claims against the source repository.                                                     |
-| `agent-vault:render`    | Build a browser-openable HTML view of project state.                                                            |
 | `agent-vault:viewer`    | Start, inspect, or stop the bundled read-only local browser viewer.                                             |
 | `agent-vault:weave`     | Audit and repair graph links, indexes, orphans, and stale references.                                           |
 
@@ -200,7 +199,7 @@ The Claude Code manifest declares hooks inline with `${CLAUDE_PLUGIN_ROOT}`. The
 
 This repository is the distributable downstream mirror, not the development authority for the mirrored components. Plugin and bundled viewer changes originate, land, and are verified in `ebt-agent-skills/plugins/ebt-vault`; the viewer development source is its `viewer/` directory. Once that upstream work is complete, it is adapted to the Agent Vault namespace and parroted into this repository. Do not develop independent plugin or viewer behavior here first.
 
-The manual operations and bundled viewer include the accepted EBT modernization and viewer integration at `3e75fd6`. Lifecycle hooks and their orient/handoff/render guidance still use Agent Vault’s existing behavior described above; automatic continuity modernization is a separate synchronization capability.
+The initial plugin modernization and bundled viewer integration were accepted upstream at `3e75fd6`; lifecycle routing and startup-cache corrections followed at `8601ca9`. Both are adapted to Agent Vault’s identity and installed-host root handling.
 
 That synchronization rule governs implementation, not release numbering. Agent Vault owns its marketplace and manifest versions independently; they do not need to match the `ebt-vault` plugin version in `ebt-agent-skills`.
 

@@ -27,22 +27,15 @@ project_path="$("$PLUGIN_ROOT/bin/resolve-project.sh" "$vault" 2>/dev/null)" || 
 context="$("$PLUGIN_ROOT/bin/vault-index.sh" "$project_path" --preamble 2>/dev/null)" || exit 0
 [[ -n "$context" ]] || exit 0
 
-# Prime the git-commit-link hook's HEAD cache so the very first commit of this
-# session is correctly detected. Without priming, the first commit-mentioning
-# Bash call would be treated as a cold-start and either eaten (old behavior) or
-# falsely linked (new behavior). Priming sidesteps both.
-if git_root="$(git rev-parse --show-toplevel 2>/dev/null)" \
-   && sha_full="$(git -C "$git_root" rev-parse HEAD 2>/dev/null)"; then
-  cache_dir="${TMPDIR:-/tmp}/agent-vault-cache"
-  mkdir -p "$cache_dir" 2>/dev/null && {
-    repo_key="$(printf '%s' "$git_root" | shasum 2>/dev/null | cut -c1-12)"
-    [[ -n "$repo_key" ]] && printf '%s' "$sha_full" > "$cache_dir/head-$repo_key"
-    # Last-writer-wins per repo: concurrent sessions on the same checkout will
-    # clobber each other's stash, so skills prefer $CLAUDE_SESSION_ID when set.
-    if [[ -n "$repo_key" && -n "$session_id" ]]; then
-      printf '%s' "$session_id" > "$cache_dir/session-$repo_key"
-    fi
-  }
+# Last-writer-wins per repo: concurrent sessions on the same checkout will
+# clobber each other's stash, so skills prefer $CLAUDE_SESSION_ID when set.
+if [[ -n "$session_id" ]] && git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+  repo_key="$(printf '%s' "$git_root" | shasum 2>/dev/null | cut -c1-12)"
+  if [[ -n "$repo_key" ]]; then
+    cache_dir="${TMPDIR:-/tmp}/agent-vault-cache"
+    mkdir -p "$cache_dir" 2>/dev/null \
+      && printf '%s' "$session_id" > "$cache_dir/session-$repo_key"
+  fi
 fi
 
 # Emit additionalContext via JSON so Claude Code injects it as context, not a transcript message.

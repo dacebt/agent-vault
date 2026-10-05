@@ -1,64 +1,73 @@
 ---
 name: orient
 description: >-
-  Print the full current state of the project's vault — tasks by status, recent
-  journal/decisions/notes, graph shape, README focus — to align agent and user. Has a shareable
-  mode for a standup or PR description. Use for "where are we", "what's the state", "what was I
-  working on", "orient me", "pick up where we left off", "give me a status". For a specific
-  past-work question ("have we decided X"), use agent-vault:recall.
+  Summarize a project's recorded vault state for orientation, resuming context, or a
+  shareable status report. Use for "where are we", "what was I working on", or a
+  standup. For a specific question about prior work or a decision, use agent-vault:recall.
 ---
 
 # agent-vault:orient
 
-Before using bundled files, set `AGENT_VAULT_PLUGIN_ROOT` to the plugin root two levels above the directory containing this loaded `SKILL.md`. Resolve it from the loaded skill path on every invocation; do not assume a checkout path or rely on a host-specific plugin-root variable.
+Give the user a grounded picture of the project's state from its tasks, knowledge,
+decisions, journal, handoffs, and README. Orientation is read-only: it does not move
+tasks, spend handoffs, repair links, or start the work it discovers.
 
-Surface everything the agent and user need to be on the same page — across all the vault's layers, not just the task kanban. Two modes: the default **in-conversation** read, and a **shareable** report you can hand to someone else.
+Use conversational output by default, including for "give me a status". Compose a
+shareable report when the user names an audience or deliverable such as a standup or
+PR description. A specific historical question belongs to [recall](../recall/SKILL.md).
+Match the breadth and detail to the request; a status question need not become a
+vault health audit.
 
-The vault layers:
+## Locate the records
 
-- **Coordination** (`tasks/`) — the kanban. What to do.
-- **Knowledge** (`knowledge/`) — second brain. Notes, learnings, references, navigable via `knowledge/index.md`.
-- **Decisions/reference** (`docs/`, `docs/decisions/`) — ADRs and structured docs. The why and the how.
+Resolve the plugin root from this loaded `SKILL.md`: two directories above
+`skills/orient/`. Helper paths below are relative to that root. Use quoted absolute
+paths in commands rather than relying on a host-specific environment variable.
 
-Plus the connective tissue: **journal** (dated narrative), **handoffs** (resume-points — read the latest in full via `agent-vault:handoff` when resuming), **README** (identity + focus), and the **link graph** itself.
+Run `bin/resolve-project.sh` from the intended source checkout to locate its vault
+project; `bin/find-vault.sh` resolves the containing vault root. The project resolver
+returns a destination even when it has not been created, so check that it exists.
+For missing storage, explain that the project is not tracked and offer
+[bootstrap](../bootstrap/SKILL.md). Do not create storage during orientation. Report
+a resolution or database failure as such, rather than presenting it as an empty board.
 
-## When to use
+The SessionStart preamble is a resource map with a recent journal excerpt and up to
+three handoff references. It helps locate context; it is not a full status report
+or an instruction to resume whichever record is newest.
 
-- "Where are we", "what's the state", "what was I working on", "pick up where we left off".
-- "Give me a status", "write up where we are", "draft a standup", "PR description from this work" → use **shareable mode**.
-- After a break or new session, when the SessionStart preamble's headlines aren't enough.
+## Read for the requested picture
 
-## Default mode — in-conversation
+- For broad orientation, run `bin/vault-index.sh <project-path> --full`. It lists
+  in-progress, blocked, todo, and backlog tasks, done tasks from the last 14 days, and
+  recent journal, handoff, decision, and knowledge records. This is an entry point,
+  not every record or a complete account of each task.
+- Read the README's project identity, current focus, and open questions. Read the
+  relevant records behind index entries when their details affect the summary.
+- Tasks live in `tasks/tasks.sqlite3`. Use the existing
+  [task commands](../../reference/task-commands.md) for `list` and `show` when you
+  need another time range, task bodies, or recorded commit links. A task's status
+  alone does not establish what was delivered.
+- For resume context, choose the handoff whose subject matches the requested work
+  and read it in full. Use its account as dated evidence and check current relevance
+  before presenting its next step as current. If it is spent or contradicted, report
+  that finding; orientation does not mark it spent. The
+  [handoff skill](../handoff/SKILL.md) owns handoff writing and lifecycle actions.
+- Include graph shape when it helps the requested orientation. Run
+  `bin/graph-audit.sh --quick <project-path>` and use its `SUMMARY:` fields for the
+  headline. Findings can point to [weave](../weave/SKILL.md); they do not block the
+  report or authorize repairs. Similarly, surface relevant stale-work signals
+  without turning them into a [groom](../groom/SKILL.md) pass.
 
-1. Resolve vault + project via `${AGENT_VAULT_PLUGIN_ROOT}/bin/find-vault.sh` and `resolve-project.sh`. If either fails, the project isn't tracked — offer `agent-vault:bootstrap`.
-2. Run `${AGENT_VAULT_PLUGIN_ROOT}/bin/vault-index.sh <project-path> --full` and present the structured output — tasks (all statuses), recent journal, recent decisions, recent notes.
-3. Read the project `README.md`; surface "What this is" + "Current focus" inline. Skip the static Index boilerplate.
-4. **Graph shape** — a separate one-line read of the brain's connectivity. Run `${AGENT_VAULT_PLUGIN_ROOT}/bin/graph-audit.sh --quick <project-path>` and read its machine-readable `SUMMARY:` line (concepts / orphans / dangling / legacy). Surface that headline; if graph findings exist, note that `agent-vault:weave` can fix them.
-5. If any in-progress task is untouched 7+ days, flag it — a `agent-vault:groom` candidate.
+## Present the state
 
-Lead with the project name and a one-line situation summary the user can verify ("N in-progress, last journal X days ago, focus is Y, graph has Z orphans"). Then the structured listing by layer. Don't read out every field.
+Lead with the project and a situation summary supported by the records. Organize
+the rest around what the user needs to understand: current work, recorded outcomes,
+recent decisions, focus, and blockers. Name gaps or conflicting records instead of
+inventing progress or treating an empty knowledge layer as a failed setup.
 
-## Shareable mode — the report you hand to someone else
-
-When the user wants something to share (a teammate, a stakeholder, a PR description, a standup), compose a terse grounded report. **Pull from the vault — never invent.**
-
-1. **Project + one-line situation** — where we are right now.
-2. **In progress** — each in-progress task, one line on where it stands (pull from the body + the auto-linked commit trail).
-3. **Recently done** — last 7 days of done tasks, one line each.
-4. **Recent decisions** — ADRs from the last 14 days. New decisions are progress even when nothing "completed".
-5. **What's next** — README Current Focus + the next 1–2 todo tasks.
-6. **Blockers** — README open questions, any `task_status: blocked` tasks.
-
-Under one screenful unless asked for depth. **Tone: factual, terse, no adjectives** ("great progress!" adds nothing — the reader forms their own view). If the journal is sparse, the report is sparse — that's accurate, and a signal to journal more.
-
-For a rendered/linkable version, generate HTML via `agent-vault:render` and hand over the path.
-
-## Routing away
-
-When an orient question is really a **recall** question ("what did I learn about X", "have I decided about Y"), don't dump the full orient — invoke `agent-vault:recall` with the specific question.
-
-## What it does NOT do
-
-- Doesn't modify anything. Pure read.
-- Doesn't propose grooming actions (`agent-vault:groom`) or fix the graph (`agent-vault:weave`) — it surfaces signals and points at them.
-- Doesn't invent achievements not recorded in the vault.
+A shareable report uses the same evidence, shaped for its audience and requested
+period. Read task bodies and relevant journal or decision records before describing
+outcomes. Make the reporting period clear; the index's recent windows may not match
+it. Include useful next steps from recorded focus and tasks without promising work
+or creating new tasks. Draft the report in the conversation unless another output
+was requested; sharing it with others is a separate action.

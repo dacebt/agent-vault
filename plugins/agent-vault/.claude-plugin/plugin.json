@@ -1,7 +1,7 @@
 {
   "name": "agent-vault",
   "version": "0.11.1",
-  "description": "Durable project memory under ~/agent-vault (overridable via AGENT_VAULT): scaffold-only setup, knowledge and decision capture, direct SQLite task changes, retrieval, journals, handoffs, and a bundled loopback-only viewer. Existing hooks orient sessions, link new commits to an active task, preserve unfinished work before compaction, and capture substantive work at session end. Silently no-ops outside a tracked project bundle.",
+  "description": "Durable project memory under ~/agent-vault (overridable via AGENT_VAULT). Ten skills cover scaffold-only setup, knowledge and decision capture, journals, handoffs, retrieval, orientation, maintenance, and a bundled read-only viewer. Direct SQLite task helpers and hooks provide a startup resource map, verified commit linking, and supervised best-effort continuity capture.",
   "author": {
     "name": "David Colon",
     "email": "38386583+Da-Colon@users.noreply.github.com"
@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-session-start.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/bin/hook-session-start.sh\"",
             "statusMessage": "Orienting from Agent Vault"
           }
         ]
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-git-commit-link.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/bin/hook-git-commit-link.sh\""
           }
         ]
       }
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-user-prompt-wrapup.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/bin/hook-user-prompt-wrapup.sh\""
           }
         ]
       }
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-precompact-handoff.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/bin/hook-precompact-handoff.sh\"",
             "statusMessage": "Writing pre-compaction handoff to Agent Vault",
             "timeout": 300
           }
@@ -56,9 +56,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/bin/hook-sessionend-capture.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/bin/hook-sessionend-capture.sh\"",
             "statusMessage": "Capturing session to Agent Vault",
-            "timeout": 300
+            "timeout": 3
           }
         ]
       }

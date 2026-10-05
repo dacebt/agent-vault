@@ -9,7 +9,7 @@
     {
       "name": "agent-vault",
       "version": "0.11.1",
-      "description": "Durable project memory for Claude Code: scaffold-only setup, knowledge and decision capture, direct SQLite task changes, journals, handoffs, a local viewer, and existing lifecycle hooks under ~/agent-vault.",
+      "description": "Durable project memory for Claude Code: ten skills for setup, capture, retrieval, maintenance, and a local viewer; direct SQLite task edits, a startup resource map, verified commit links, and supervised continuity under ~/agent-vault.",
       "author": {
         "name": "David Colon"
       },

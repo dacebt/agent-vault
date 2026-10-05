@@ -1,99 +1,200 @@
 #!/usr/bin/env bash
-# hook-git-commit-link.sh — PostToolUse hook on the Bash tool.
-#
-# When a Bash command results in a new git commit, append the new commit's short
-# SHA + subject to the most-recently-touched SQLite task in progress. Builds a
-# self-maintaining trail from task → commits without the agent having to remember.
-#
-# Detection strategy: compare the project repo's current HEAD against the last
-# observed HEAD (cached per-repo). HEAD moving is the definitive signal a commit
-# happened — far more reliable than parsing the command string (which may look
-# like `git -c user.email=x commit`, `git -C foo commit`, `... && git commit`,
-# etc.). A coarse "command mentions commit" filter runs first to skip the 99% of
-# Bash calls that aren't commit-adjacent.
-#
-# Multiple in-progress tasks: the most recently modified one wins. Imperfect (a
-# stray housekeeping commit will link to whatever task you last touched) but the
-# noise is acceptable — much better than missing the real links.
-#
-# Silent on any miss: no vault, no project, no in-progress tasks, no HEAD change
-# all exit 0 quietly.
+# Link verified receipts from explicit Git commit commands to the most recently
+# touched in-progress or blocked task. Existing associations make retries idempotent; a
+# recorded task is acknowledged only after its database matches the committed blob.
 
 set -euo pipefail
-
 PLUGIN_ROOT="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+command -v python3 >/dev/null 2>&1 || { echo 'agent-vault commit link: python3 is required' >&2; exit 1; }
 
-command -v jq >/dev/null 2>&1 || exit 0
+exec python3 - "$PLUGIN_ROOT" 3<&0 <<'PY'
+from __future__ import annotations
 
-input="$(cat)"
-[[ -n "$input" ]] || exit 0
+import datetime
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+from pathlib import Path
 
-cmd="$(echo "$input" | jq -r '.tool_input.command // .input.command // .command // empty' 2>/dev/null)"
-[[ -n "$cmd" ]] || exit 0
 
-# Cheap pre-filter: skip anything that doesn't even mention commit.
-echo "$cmd" | grep -qE '\bcommit\b' || exit 0
+class CaptureError(Exception):
+    pass
 
-# Locate the project repo via git.
-git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 
-sha_full="$(git -C "$git_root" rev-parse HEAD 2>/dev/null)" || exit 0
+def run(args: list[str], *, body: str | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, input=body, capture_output=True, text=True)
 
-# Per-repo cache of the last HEAD we observed.
-cache_dir="${TMPDIR:-/tmp}/agent-vault-cache"
-mkdir -p "$cache_dir" 2>/dev/null || exit 0
-repo_key="$(printf '%s' "$git_root" | shasum 2>/dev/null | cut -c1-12)"
-[[ -n "$repo_key" ]] || exit 0
-cache_file="$cache_dir/head-$repo_key"
 
-prev_sha="$(cat "$cache_file" 2>/dev/null || true)"
-[[ "$prev_sha" == "$sha_full" ]] && exit 0  # HEAD didn't move; not a commit event.
-printf '%s' "$sha_full" > "$cache_file"
+def checked(args: list[str], *, body: str | None = None) -> str:
+    result = run(args, body=body)
+    if result.returncode:
+        detail = result.stderr.strip() or f"exit {result.returncode}"
+        raise CaptureError(f"{Path(args[0]).name} failed: {detail}")
+    return result.stdout
 
-# If the cache was missing (no SessionStart priming in this session and no prior
-# observation), prev_sha is empty — we still proceed to link. The pre-filter on
-# "command mentions commit" keeps the false-positive rate acceptable: the worst
-# case is a `git log --grep=commit` style command linking the existing HEAD once
-# per session, which is rare and harmless (just delete the line in the task).
 
-# Confirmed: a new commit landed. Find vault + project.
-vault="$("$PLUGIN_ROOT/bin/find-vault.sh" 2>/dev/null)" || exit 0
-project_path="$("$PLUGIN_ROOT/bin/resolve-project.sh" "$vault" 2>/dev/null)" || exit 0
-task_db="$PLUGIN_ROOT/bin/task-db.py"
-database="$project_path/tasks/tasks.sqlite3"
-[[ -f "$database" ]] || exit 0
+def result_text(event: dict) -> str:
+    response = event.get("tool_response", event.get("tool_result"))
+    if isinstance(response, str):
+        return response
+    if isinstance(response, dict):
+        for key in ("stdout", "output"):
+            text = response.get(key)
+            if isinstance(text, str):
+                return text
+    return ""
 
-# Most recently modified in-progress task.
-active_id="$(python3 "$task_db" list "$project_path" --status in-progress --status blocked 2>/dev/null \
-  | jq -r 'sort_by(.generated_at) | last | .id // empty')"
-[[ -n "$active_id" ]] || exit 0
 
-sha="$(git -C "$git_root" rev-parse --short HEAD 2>/dev/null)" || exit 0
-subject="$(git -C "$git_root" log -1 --pretty=%s 2>/dev/null)" || exit 0
-date="$(date +%Y-%m-%d)"
+def invokes_commit(event: dict) -> bool:
+    tool_input = event.get("tool_input", event.get("input", {}))
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    if command is None:
+        command = event.get("command")
+    if not isinstance(command, str):
+        return False
+    lexer = shlex.shlex(command, posix=False, punctuation_chars=";&|()\n")
+    lexer.whitespace = " \t\r"
+    try:
+        tokens = list(lexer)
+    except ValueError:
+        return False
+    segments: list[list[str]] = [[]]
+    for token in tokens:
+        if all(character in ";&|()\n" for character in token):
+            segments.append([])
+        else:
+            segments[-1].append(token)
+    for segment in segments:
+        while segment and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", segment[0]):
+            segment = segment[1:]
+        if not segment or Path(segment[0].strip("\"'")).name != "git":
+            continue
+        index = 1
+        while index < len(segment) and segment[index].startswith("-"):
+            option = segment[index]
+            if option in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"):
+                index += 2
+            elif option in (
+                "--no-pager", "--paginate", "--no-optional-locks", "--no-replace-objects"
+            ) or option.startswith((
+                "-C", "-c", "--git-dir=", "--work-tree=", "--namespace=", "--config-env="
+            )):
+                index += 1
+            else:
+                break
+        if index < len(segment) and segment[index] == "commit":
+            return True
+    return False
 
-new_line="- ${date} — \`${sha}\` ${subject}"
 
-task_json="$(python3 "$task_db" show "$project_path" "$active_id" 2>/dev/null)" || exit 0
-body_file="$(mktemp "${TMPDIR:-/tmp}/agent-vault-task-body.XXXXXX")" || exit 0
-trap 'rm -f "$body_file" "$body_file.next"' EXIT
-printf '%s' "$task_json" | jq -r '.body_markdown' > "$body_file"
+def read_tasks(task_cli: list[str], project: str) -> list[dict]:
+    tasks = json.loads(checked([*task_cli, "list", project]))
+    if not isinstance(tasks, list) or any(
+        not isinstance(task, dict) or any(not isinstance(task.get(key), str) for key in
+        ("id", "task_status", "generated_at", "body_markdown")) for task in tasks
+    ):
+        raise CaptureError("task list returned invalid records")
+    return tasks
 
-# Idempotency: don't re-add a SHA that's already linked.
-if grep -qF "\`${sha}\`" "$body_file" 2>/dev/null; then
-  exit 0
-fi
 
-if grep -q '^## Commits' "$body_file"; then
-  awk -v new="$new_line" '
-    /^## Commits/ && !done { print; print new; done=1; next }
-    { print }
-  ' "$body_file" > "$body_file.next" && mv "$body_file.next" "$body_file"
-else
-  printf '\n## Commits\n%s\n' "$new_line" >> "$body_file"
-fi
+def insert_link(body: str, line: str) -> str:
+    heading = re.search(r"^## Commits[ \t]*(?:\r?\n|$)", body, re.MULTILINE)
+    if heading:
+        prefix = body[:heading.end()]
+        return prefix + ("" if prefix.endswith("\n") else "\n") + line + "\n" + body[heading.end():]
+    return body + ("" if not body or body.endswith("\n") else "\n") + "\n## Commits\n" + line + "\n"
 
-python3 "$task_db" update "$project_path" "$active_id" --body-file "$body_file" >/dev/null 2>&1 || exit 0
-"$PLUGIN_ROOT/bin/vault-commit.sh" "docs(vault): link commit $sha" "$database" >/dev/null 2>&1 || exit 0
 
-exit 0
+def main() -> None:
+    raw = os.fdopen(3).read()
+    if not raw.strip():
+        return
+    event = json.loads(raw)
+    if not isinstance(event, dict):
+        raise CaptureError("hook input must be a JSON object")
+    if not invokes_commit(event):
+        return
+    for key in ("cwd", "current_working_directory"):
+        if key in event:
+            cwd = event[key]
+            if not isinstance(cwd, str) or not cwd or not Path(cwd).is_absolute() or not Path(cwd).is_dir():
+                return
+            os.chdir(cwd)
+            break
+
+    output = re.sub(r"\x1b\[[0-9;]*m", "", result_text(event))
+    receipts = re.findall(r"^\[[^\]\r\n]+ ([0-9a-fA-F]{4,64})\] [^\r\n]*$", output, re.MULTILINE)
+    if not receipts:
+        return
+    repository = run(["git", "rev-parse", "--show-toplevel"])
+    if repository.returncode:
+        return
+    git = ["git", "-C", repository.stdout.strip()]
+    commits: list[str] = []
+    for receipt in receipts:
+        resolved = run([*git, "rev-parse", "--verify", f"{receipt}^{{commit}}"])
+        if resolved.returncode:
+            continue
+        sha = resolved.stdout.strip()
+        if sha not in commits:
+            commits.append(sha)
+    if not commits:
+        return
+
+    plugin = Path(sys.argv[1])
+    vault = run([str(plugin / "bin/find-vault.sh")])
+    if vault.returncode:
+        return
+    project_result = run([str(plugin / "bin/resolve-project.sh"), vault.stdout.strip()])
+    if project_result.returncode:
+        return
+    project = project_result.stdout.strip()
+    database = Path(project) / "tasks/tasks.sqlite3"
+    if not database.is_file():
+        return
+    task_cli = [sys.executable, str(plugin / "bin/task-db.py")]
+    tasks = read_tasks(task_cli, project)
+    active = [task for task in tasks if task["task_status"] in ("in-progress", "blocked")]
+    selected = sorted(active, key=lambda task: task["generated_at"])[-1] if active else None
+    recorded: list[str] = []
+    for sha in commits:
+        short = checked([*git, "rev-parse", "--short", sha]).strip()
+        associated = next((task for task in tasks if f"`{short}`" in task["body_markdown"]
+                           or f"`{sha}`" in task["body_markdown"]), None)
+        if associated is None:
+            if selected is None:
+                continue
+            task = json.loads(checked([*task_cli, "show", project, selected["id"]]))
+            body = task.get("body_markdown")
+            if not isinstance(body, str):
+                raise CaptureError("task body is not text")
+            subject = checked([*git, "show", "-s", "--format=%s", sha]).removesuffix("\n")
+            today = datetime.date.today().isoformat()
+            updated = insert_link(body, f"- {today} — `{short}` {subject}")
+            checked([*task_cli, "update", project, selected["id"], "--body-file", "-"], body=updated)
+            saved = json.loads(checked([*task_cli, "show", project, selected["id"]]))
+            if saved.get("body_markdown") != updated:
+                raise CaptureError(f"task {selected['id']} did not preserve the recorded commit")
+            selected["body_markdown"] = updated
+        recorded.append(short)
+    if not recorded:
+        return
+
+    checked([str(plugin / "bin/vault-commit.sh"), "docs(vault): link commits " + ", ".join(recorded), str(database)])
+    vault_repo = checked(["git", "-C", str(database.parent), "rev-parse", "--show-toplevel"]).strip()
+    relative = database.resolve().relative_to(Path(vault_repo).resolve()).as_posix()
+    committed = checked(["git", "-C", vault_repo, "rev-parse", "--verify", f"HEAD:{relative}"]).strip()
+    actual = checked(["git", "-C", vault_repo, "hash-object", str(database)]).strip()
+    if committed != actual:
+        raise CaptureError("task database was written but not committed; retry this receipt after resolving vault Git errors")
+
+
+try:
+    main()
+except (CaptureError, OSError, ValueError, KeyError, TypeError) as error:
+    print(f"agent-vault commit link: {error}", file=sys.stderr)
+    sys.exit(1)
+PY
