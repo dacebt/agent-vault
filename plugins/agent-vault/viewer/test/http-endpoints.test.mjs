@@ -66,6 +66,29 @@ async function getJson(request, pathname) {
   return { status: response.status, json: JSON.parse(response.body) };
 }
 
+test('raw attachments are sandboxed without script or same-origin privileges', async (t) => {
+  const { projectDir, projectName, vaultRoot } = createValidSqliteProject(t);
+  const attachments = {
+    'probe.html': '<h1>Attachment</h1><script>fetch("/api/projects")</script>',
+    'probe.svg': '<svg xmlns="http://www.w3.org/2000/svg"><script>fetch("/api/projects")</script></svg>',
+  };
+  await withServer(t, vaultRoot, async (request) => {
+    for (const [name, body] of Object.entries(attachments)) {
+      fs.writeFileSync(path.join(projectDir, 'artifacts', name), body);
+      const response = await request(`/raw/${projectName}/artifacts/${name}`);
+      assert.equal(response.status, 200);
+      assert.equal(response.body, body);
+      const directives = new Map(response.headers['Content-Security-Policy'].split(';').map((part) => {
+        const [name, ...values] = part.trim().split(/\s+/);
+        return [name, values];
+      }));
+      assert.deepEqual(directives.get('sandbox'), []);
+      assert.deepEqual(directives.get('script-src') || directives.get('default-src'), ["'none'"]);
+      assert.equal(response.headers['X-Content-Type-Options'], 'nosniff');
+    }
+  });
+});
+
 test('HTTP endpoints preserve status contracts for valid, malformed, absent, and broken databases', async (t) => {
   const { projectDir, projectName, vaultRoot } = createValidSqliteProject(t);
   fs.writeFileSync(path.join(projectDir, 'knowledge', 'UPPER.MD'), '# Uppercase Markdown\n');

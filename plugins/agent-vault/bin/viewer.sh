@@ -124,15 +124,15 @@ stored_value() {
 }
 
 health_identity() {
-  local url="$1" expected_pid="$2"
+  local url="$1" expected_pid="$2" require_ready="${3:-true}"
   node -e \
-    "fetch(process.argv[1], { signal: AbortSignal.timeout(1000) }).then(async response => { const body = await response.json(); const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/; if (!response.ok || body.ok !== true || body.pid !== Number(process.argv[2]) || typeof body.instanceId !== 'string' || !uuid.test(body.instanceId)) process.exit(1); process.stdout.write(body.instanceId); }).catch(() => process.exit(1));" \
-    "$url" "$expected_pid" 2>/dev/null
+    "fetch(process.argv[1], { signal: AbortSignal.timeout(1000) }).then(async response => { const body = await response.json(); const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/; if ((process.argv[3] === 'true' && (!response.ok || body.ok !== true)) || body.pid !== Number(process.argv[2]) || typeof body.instanceId !== 'string' || !uuid.test(body.instanceId)) process.exit(1); process.stdout.write(body.instanceId); }).catch(() => process.exit(1));" \
+    "$url" "$expected_pid" "$require_ready" 2>/dev/null
 }
 
 health_matches() {
   local url="$1" expected_pid="$2" expected_instance_id="$3" observed_instance_id
-  observed_instance_id="$(health_identity "$url" "$expected_pid")" || return 1
+  observed_instance_id="$(health_identity "$url" "$expected_pid" false)" || return 1
   [[ "$observed_instance_id" == "$expected_instance_id" ]]
 }
 

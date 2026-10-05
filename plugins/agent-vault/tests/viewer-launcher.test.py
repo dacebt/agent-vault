@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -105,6 +106,40 @@ class ViewerLauncherTest(unittest.TestCase):
         self.assertIn("viewer stopped", stopped.stdout)
         self.assertFalse((self.state / "viewer.pid").exists())
         self.assertIn("viewer stopped", self.invoke("status").stdout)
+
+    def test_unavailable_vault_preserves_identity_and_owned_stop(self) -> None:
+        self.invoke("start")
+        pid = int((self.state / "viewer.pid").read_text())
+        instance_id = (self.state / "viewer.instance-id").read_text().strip()
+        offline_vault = self.root / "offline-vault"
+        self.vault.rename(offline_vault)
+        try:
+            with self.assertRaises(urllib.error.HTTPError) as failure:
+                urllib.request.urlopen(f"http://127.0.0.1:{self.port}/api/health", timeout=2)
+            with failure.exception as response:
+                self.assertEqual(response.code, 503)
+                health = json.load(response)
+            self.assertFalse(health["ok"])
+            self.assertEqual(health["pid"], pid)
+            self.assertEqual(health["instanceId"], instance_id)
+            self.assertIn(f"pid: {pid}", self.invoke("status").stdout)
+
+            (self.state / "viewer.instance-id").write_text(
+                "00000000-0000-4000-8000-000000000000\n", encoding="utf-8"
+            )
+            rejected = self.invoke("stop", check=False)
+            self.assertNotEqual(rejected.returncode, 0)
+            os.kill(pid, 0)
+            (self.state / "viewer.instance-id").write_text(instance_id + "\n", encoding="utf-8")
+
+            self.invoke("stop")
+            self.assertFalse((self.state / "viewer.pid").exists())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pid, 0)
+        finally:
+            offline_vault.rename(self.vault)
+            if (self.state / "viewer.pid").exists():
+                (self.state / "viewer.instance-id").write_text(instance_id + "\n", encoding="utf-8")
 
     def test_launcher_resolves_bundled_server_from_its_own_path(self) -> None:
         environment = {

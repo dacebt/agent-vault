@@ -2,7 +2,7 @@
 
 Agent Vault Viewer is a local, read-only viewer for an Agent Vault. It discovers projects that own `tasks/tasks.sqlite3`, presents their task board, concept graph, and physical file tree, opens Markdown documents and task records, and refreshes through filesystem watching and server-sent events.
 
-The viewer is adapted from the integrated development source at `ebt-agent-skills/plugins/ebt-vault/viewer/`, including the accepted EBT integration at `3e75fd6`. Viewer changes land and are verified there first, then are mirrored here with Agent Vault branding and namespaces. The former standalone `ebt-vault-viewer` checkout is no longer the development source.
+The viewer is adapted from the integrated development source at `ebt-agent-skills/plugins/ebt-vault/viewer/`, including the accepted EBT integration at `3e75fd6` and viewer repairs at `b41183a`. Viewer changes land and are verified there first, then are mirrored here with Agent Vault branding and namespaces. The former standalone `ebt-vault-viewer` checkout is no longer the development source.
 
 The viewer is a plain Node server with a vanilla HTML/CSS/JavaScript frontend. Its browser dependency, `marked`, is vendored under `vendor/`; there is no package install or build step.
 
@@ -36,7 +36,9 @@ AGENT_VAULT=/path/to/agent-vault PORT=8484 node server.mjs
 
 The server listens on `127.0.0.1` only and does not provide task mutation endpoints.
 
-For managed start, status, and stop operations, use the plugin's [viewer launcher](../bin/viewer.sh) through the [viewer skill](../skills/viewer/SKILL.md). Each server instance generates a UUID. The health response includes that identity and the serving process ID so the launcher can verify the exact instance before claiming or signaling it.
+Raw attachments are served in a browser sandbox without script or same-origin privileges. Static HTML and SVG content can be viewed, but scripts, forms, and external resources in attachments are blocked.
+
+For managed start, status, and stop operations, use the plugin's [viewer launcher](../bin/viewer.sh) through the [viewer skill](../skills/viewer/SKILL.md). Each server instance generates a UUID. The health response includes that identity and the serving process ID even when the vault is unavailable, so the launcher can verify the exact instance before claiming or signaling it. Startup also requires a healthy vault; stopping an owned instance does not.
 
 ## Verify
 

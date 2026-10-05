@@ -116,7 +116,7 @@ export function createViewerServer(options = {}) {
 
     if (pathname === '/api/health') {
       if (!vaultStore.isUsable()) {
-        return sendJson(res, 503, { ok: false, vault, error: 'vault unavailable' });
+        return sendJson(res, 503, { ok: false, vault, pid: process.pid, instanceId, error: 'vault unavailable' });
       }
       return sendJson(res, 200, { ok: true, vault, pid: process.pid, instanceId });
     }
@@ -221,6 +221,8 @@ export function createViewerServer(options = {}) {
       res.writeHead(200, {
         'Content-Type': MIME[path.extname(abs).toLowerCase()] || 'application/octet-stream',
         'Cache-Control': 'no-store',
+        'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'",
+        'X-Content-Type-Options': 'nosniff',
       });
       return res.end(data);
     }

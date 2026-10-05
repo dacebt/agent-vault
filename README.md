@@ -199,7 +199,7 @@ The Claude Code manifest declares hooks inline with `${CLAUDE_PLUGIN_ROOT}`. The
 
 This repository is the distributable downstream mirror, not the development authority for the mirrored components. Plugin and bundled viewer changes originate, land, and are verified in `ebt-agent-skills/plugins/ebt-vault`; the viewer development source is its `viewer/` directory. Once that upstream work is complete, it is adapted to the Agent Vault namespace and parroted into this repository. Do not develop independent plugin or viewer behavior here first.
 
-The initial plugin modernization and bundled viewer integration were accepted upstream at `3e75fd6`; lifecycle routing and startup-cache corrections followed at `8601ca9`. Both are adapted to Agent Vault’s identity and installed-host root handling.
+The initial plugin modernization and bundled viewer integration were accepted upstream at `3e75fd6`; lifecycle routing and startup-cache corrections followed at `8601ca9`. Both are adapted to Agent Vault’s identity and installed-host root handling. Release `0.12.0` also includes upstream viewer repairs from `b41183a`: sandboxed attachments and verified shutdown when the vault is unavailable.
 
 That synchronization rule governs implementation, not release numbering. Agent Vault owns its marketplace and manifest versions independently; they do not need to match the `ebt-vault` plugin version in `ebt-agent-skills`.
 

@@ -49,7 +49,7 @@ Markdown concepts and SQLite task concepts share one graph. File concepts use bu
 
 Manual operations use scaffold-only bootstrap, consolidated capture for decisions and task content, and [direct task commands](reference/task-commands.md) without transition or WIP prerequisites. Orientation is read-only; handoff writing and explicit lifecycle actions preserve the unit’s actual state and verify durability.
 
-The development authority for both plugin and viewer is `ebt-agent-skills/plugins/ebt-vault`. This package adapts the accepted plugin source through `8601ca9` to Agent Vault namespaces; the bundled viewer remains the import accepted at `3e75fd6`. Release versions remain independently owned.
+The development authority for both plugin and viewer is `ebt-agent-skills/plugins/ebt-vault`. This package adapts the accepted plugin source through `8601ca9` and viewer review repairs at `b41183a` to Agent Vault namespaces. Release versions remain independently owned.
 
 ## Verification
 

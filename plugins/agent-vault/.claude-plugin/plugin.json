@@ -1,6 +1,6 @@
 {
   "name": "agent-vault",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "Durable project memory under ~/agent-vault (overridable via AGENT_VAULT). Ten skills cover scaffold-only setup, knowledge and decision capture, journals, handoffs, retrieval, orientation, maintenance, and a bundled read-only viewer. Direct SQLite task helpers and hooks provide a startup resource map, verified commit linking, and supervised best-effort continuity capture.",
   "author": {
     "name": "David Colon",
