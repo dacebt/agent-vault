@@ -58,9 +58,8 @@ PreCompact and SessionEnd use `codex exec` for their headless transcript reconst
 
 | Skill                   | Purpose                                                                                                         |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `agent-vault:bootstrap` | Scaffold a project bundle and extract a linked architecture/conventions spine from observable repository state. |
-| `agent-vault:capture`   | Record a note, reference, decision, or explicitly requested task and wire it into the graph.                    |
-| `agent-vault:decide`    | Capture a real architectural choice as a linked ADR.                                                            |
+| `agent-vault:bootstrap` | Set up project storage, optionally capturing initial context when requested. |
+| `agent-vault:capture`   | Save or update knowledge, references, decisions, and explicitly requested tasks.                    |
 | `agent-vault:groom`     | Audit task, decision, handoff, and durability hygiene.                                                          |
 | `agent-vault:handoff`   | Write the exact resume-point for unfinished work.                                                               |
 | `agent-vault:journal`   | Append a grounded dated account of substantive work.                                                            |
@@ -68,9 +67,10 @@ PreCompact and SessionEnd use `codex exec` for their headless transcript reconst
 | `agent-vault:recall`    | Answer a specific prior-work question by traversing links and backlinks.                                        |
 | `agent-vault:refresh`   | Check current-reality claims against the source repository.                                                     |
 | `agent-vault:render`    | Build a browser-openable HTML view of project state.                                                            |
-| `agent-vault:task-flow` | Move SQLite-backed tasks through their lifecycle with acceptance and outcome discipline.                        |
 | `agent-vault:viewer`    | Start, inspect, or stop the bundled read-only local browser viewer.                                             |
 | `agent-vault:weave`     | Audit and repair graph links, indexes, orphans, and stale references.                                           |
+
+Task status and metadata changes use the [task commands](plugins/agent-vault/reference/task-commands.md) directly. Every supported status can move to every other; acceptance text, outcome notes, links, and active-task counts do not gate a move. Capture owns decision records and task content.
 
 ## Installation
 
@@ -198,13 +198,15 @@ The Claude Code manifest declares hooks inline with `${CLAUDE_PLUGIN_ROOT}`. The
 
 ## Upstream synchronization
 
-This repository is the distributable downstream mirror, not the development authority for the mirrored components. Plugin changes originate, land, and are verified in `ebt-agent-skills/plugins/ebt-vault`; viewer changes originate, land, and are verified in the standalone `ebt-vault-viewer` repository. Once that upstream work is complete, it is adapted to the Agent Vault namespace and parroted into this repository. Do not develop independent plugin or viewer behavior here first.
+This repository is the distributable downstream mirror, not the development authority for the mirrored components. Plugin and bundled viewer changes originate, land, and are verified in `ebt-agent-skills/plugins/ebt-vault`; the viewer development source is its `viewer/` directory. Once that upstream work is complete, it is adapted to the Agent Vault namespace and parroted into this repository. Do not develop independent plugin or viewer behavior here first.
+
+The manual operations and bundled viewer include the accepted EBT modernization and viewer integration at `3e75fd6`. Lifecycle hooks and their orient/handoff/render guidance still use Agent Vault’s existing behavior described above; automatic continuity modernization is a separate synchronization capability.
 
 That synchronization rule governs implementation, not release numbering. Agent Vault owns its marketplace and manifest versions independently; they do not need to match the `ebt-vault` plugin version in `ebt-agent-skills`.
 
 ## Provenance
 
-Agent Vault began as the `ebt-vault` plugin inside the private `ebt-agent-skills` collection. This repository is its standalone, publicly distributable form with an independent plugin name, marketplace, storage root, environment namespace, cache namespace, generated provenance, and repository documentation. The bundled viewer is mirrored from the standalone `ebt-vault-viewer` project.
+Agent Vault began as the `ebt-vault` plugin inside the private `ebt-agent-skills` collection. This repository is its standalone, publicly distributable form with an independent plugin name, marketplace, storage root, environment namespace, cache namespace, generated provenance, and repository documentation. The bundled viewer is mirrored from the integrated `ebt-agent-skills/plugins/ebt-vault/viewer/` source.
 
 ## License
 

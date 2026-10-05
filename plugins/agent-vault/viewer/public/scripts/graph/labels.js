@@ -26,7 +26,6 @@
     return element;
   }
 
-  // Frozen public contract: graphLabels.create(tier) -> { lines(title), dispose() }.
   function create(tier) {
     const boundary = validateTier(tier);
     if (!document.body) {

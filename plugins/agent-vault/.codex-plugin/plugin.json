@@ -1,7 +1,7 @@
 {
   "name": "agent-vault",
   "version": "0.11.1",
-  "description": "Project-memory skills, quiet hooks, and a local read-only viewer over OKF bundles with SQLite tasks.",
+  "description": "Project-memory skills for setup, capture, retrieval, and direct task edits, with existing lifecycle hooks and a local read-only viewer.",
   "author": {
     "name": "David Colon",
     "email": "38386583+Da-Colon@users.noreply.github.com"
@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "Agent Vault",
     "shortDescription": "Use a project-owned OKF bundle as memory.",
-    "longDescription": "Agent Vault gives Codex durable project memory through independently bootstrapped OKF bundles under ~/agent-vault (overridable via AGENT_VAULT), SQLite-backed task concepts, quiet lifecycle hooks, and a bundled loopback-only browser viewer.",
+    "longDescription": "Agent Vault gives Codex durable project memory through independently bootstrapped OKF bundles under ~/agent-vault (overridable via AGENT_VAULT), direct SQLite task changes, knowledge and decision capture, existing lifecycle hooks, and a bundled loopback-only browser viewer.",
     "developerName": "David Colon",
     "category": "Productivity",
     "capabilities": [

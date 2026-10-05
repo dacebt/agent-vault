@@ -52,7 +52,7 @@ def task_document(key: str, title: str, task_status: str | None, body: str) -> s
         f"{workflow}"
         f"{completed}"
         "generated:\n"
-        "  by: fixture:agent-vault\n"
+        "  by: fixture:agent-vault-viewer\n"
         "  at: 2026-08-01T12:00:00Z\n"
         "---\n"
         f"# {key}: {title}\n\n"

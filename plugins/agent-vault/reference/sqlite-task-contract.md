@@ -10,7 +10,7 @@ The containing root, normally `~/agent-vault`, is only a locator. Each direct ch
 - Store semantics: `../lib/task_store.py`
 - Hybrid graph semantics: `../lib/task_graph.py`
 - Legacy Markdown migration: `../bin/migrate-task-markdown.py`
-- Disposable integration fixture: `../tests/build-sqlite-fixture.py`
+- Disposable integration fixture: `../tests/build-viewer-sqlite-fixture.py`
 
 ## Identity and schema
 
@@ -51,7 +51,7 @@ Generate a fresh bundle for integration work instead of reading personal vault d
 
 ```sh
 fixture_root="$(mktemp -d)"
-python3 tests/build-sqlite-fixture.py "$fixture_root/sqlite-fixture"
+python3 tests/build-viewer-sqlite-fixture.py "$fixture_root/sqlite-fixture"
 ```
 
 The fixture performs a real Markdown-to-SQLite migration. Its expected task projection is one backlog, one todo, two active tasks including one blocked task, and one done task. The mixed graph contains five task nodes, three Markdown nodes, and no dangling task URIs.

@@ -1,74 +1,89 @@
 ---
 name: groom
 description: >-
-  Lifecycle hygiene pass on the vault — surfaces stale in-progress tasks, tasks missing acceptance
-  prose, done tasks missing outcome notes, ADRs stuck in proposed, orphan docs, and spent
-  handoffs. Use when the user wants to "clean up the vault", "tidy", "check what's stale", "review
-  WIP", "audit project state", or "groom the board". Checks task/decision/handoff hygiene, not the
-  link graph — that's agent-vault:weave.
+  Review a project's vault for stale work, unclear task context, unresolved decisions,
+  and spent handoffs. Use to groom the board, check what's stale, or tidy project records.
+  Surfaces lifecycle findings; graph maintenance belongs to agent-vault:weave.
 ---
 
 # agent-vault:groom
 
-Before using bundled files, set `AGENT_VAULT_PLUGIN_ROOT` to the plugin root two levels above the directory containing this loaded `SKILL.md`. Resolve it from the loaded skill path on every invocation; do not assume a checkout path or rely on a host-specific plugin-root variable.
+Keep project records useful for deciding what to do next. A grooming request produces
+findings and proposed actions by default. Carry out repairs the user has requested or
+already authorized within that scope; do not ask them to approve the same action again.
+An observation about age, missing prose, or workload does not itself authorize a change.
 
-Surface hygiene problems in the project's vault. Read-only by default — proposes specific actions, doesn't take them.
+Groom reviews lifecycle and relevance. [Weave](../weave/SKILL.md) reviews graph navigation;
+use both when the user requests a whole-vault tidy. Neither review is a prerequisite for
+a requested task move or record edit, and neither imposes a maintenance cadence.
 
-## When to use
+## Locate the project and evidence
 
-- User asks to "clean up", "tidy", "groom the board", "audit the vault", "what's stale"
-- Periodically (e.g., end of week or between work units) as a deliberate pass
-- When you notice the vault is starting to feel cluttered or out of sync with reality
+Resolve the plugin root from this loaded `SKILL.md`: two directories above
+`skills/groom/`. Helper paths below are relative to that root; use quoted absolute
+paths in commands rather than depending on a host-specific environment variable.
 
-## What to check
+Run `bin/resolve-project.sh` from the intended source checkout to locate its vault
+project; `bin/find-vault.sh` resolves the containing vault root. Run
+`bin/vault-index.sh <project-path> --full`, then inspect the relevant records through
+targeted reads and the [task commands](../../reference/task-commands.md). Keep the
+review within this project. A missing vault is a finding, not a request to create one.
 
-Pull from `vault-index.sh --full` plus targeted scans:
+## Review lifecycle signals in context
 
-1. **Stale in-progress** — any database task in `in-progress` or `blocked` whose `generated_at` is 7+ days old. Either record the blocker or complete it with an honest outcome.
+Use the project's pace, current request, and record contents to decide which signals
+matter. Age and counts help prioritize inspection; they do not prove neglect.
 
-2. **WIP creep** — more than 2 in-progress tasks. Flag and propose narrowing.
+- **Stale active work:** inspect `in-progress` and `blocked` tasks whose `generated_at`
+  suggests a long pause. Check whether their state still describes the work and propose
+  a supported update when it does not.
+- **Competing work:** consider whether active tasks obscure the current focus. Parallel
+  work can be intentional; there is no universal WIP limit.
+- **Missing task context:** identify acceptance or outcome information whose absence
+  makes a task hard to understand. These are opportunities to clarify, not prerequisites
+  for starting, completing, or otherwise moving a task. Do not invent missing outcomes.
+- **Unresolved decisions:** inspect long-lived proposed ADRs for evidence that a choice
+  remains open, was settled, or was abandoned. Age or implementation alone does not
+  establish decision intent. Propose a state update only when supported.
+- **Documents with unclear current use:** inspect records whose purpose or relation to
+  current work is unclear. Missing task or journal links do not make a document useless;
+  graph connectivity is a separate question for weave.
+- **Backlog relevance:** mention an empty or stale backlog only when it helps the user's
+  current planning. There is no requirement to keep future work queued.
+- **Spent handoffs:** check whether a live resume point was completed, superseded, or
+  duplicated. A linked task now marked `done`, an older date, or no active task is a
+  reason to inspect the handoff, not automatic proof that all its work is finished.
+- **Uncommitted records:** surface project changes that appear to have missed a durability
+  commit, preserving work owned by other sessions. `bin/vault-uncommitted.sh <project-path>`
+  lists older dirty files and deletions across the containing Git repository; use it only
+  when that repository is confined to the intended project. In a shared vault repository,
+  inspect Git changes scoped to the project instead. Empty helper output can also mean
+  recent dirty files or a non-Git destination; it does not prove a clean vault.
 
-3. **Todo without acceptance** — `todo` tasks whose stored Markdown body lacks meaningful `## Acceptance` prose.
+## Apply authorized repairs through their owners
 
-4. **Done without outcome** — `done` tasks whose stored Markdown body lacks outcome notes.
+Use the [task commands](../../reference/task-commands.md) for requested task changes.
+Moves have no acceptance, outcome, blocker-note, link, or active-task-count prerequisite.
+Moving a card does not assert that its original scope was implemented.
 
-5. **Long-lived proposed ADRs** — ADRs with `decision_status: proposed` and OKF lifecycle `status: draft` older than 14 days. Either they've been quietly enacted (set `decision_status: accepted`, `status: stable`) or abandoned (set `decision_status: rejected`, `status: deprecated`, with a one-line reason).
+For decision changes, follow [capture](../capture/SKILL.md) and its
+[decision guidance](../capture/references/decisions.md). Keep supported decision intent
+and historical reasoning distinct from observations about the implementation.
 
-6. **Orphan docs** — files in `docs/` (excluding `decisions/`) that aren't referenced by any task, ADR, or journal entry. Maybe still useful, maybe not — flag for review.
+Retire a confirmed spent handoff with
+`bin/mark-handoff-spent.sh <project-path> <handoff-id>`. It preserves the body and marks
+the record spent so SessionStart no longer lists it. Preserve history rather than
+deleting records as a tidying shortcut.
 
-7. **Empty backlog** — if the database backlog has been empty for a while, the project may be coasting on momentum without thinking ahead. Just observation, no required action.
+Inspect the changed record or task to verify the requested result and preserved content.
+Durability-commit only the exact files changed with
+`bin/vault-commit.sh <message> <changed-file>...` when the owning write path has not already
+done so. Confirm the result before claiming durability; the helper can silently skip a
+commit. An audit alone creates no changes to commit.
 
-8. **Spent handoffs** — flag a live handoff that links a `task:<uuid>` now in `done`, duplicates another live handoff for the same unit, or is older than 14 days with no matching active task. Retire it with `${AGENT_VAULT_PLUGIN_ROOT}/bin/mark-handoff-spent.sh`; don't delete history.
+## Report the useful findings
 
-9. **Uncommitted vault (durability floor)** — the vault is a git repo, but an external brain that was never committed can't be restored. Run `${AGENT_VAULT_PLUGIN_ROOT}/bin/vault-uncommitted.sh <project-path>` — it lists changes left uncommitted for 3+ days (fresh edits are fine; days-old dirty state is the smell). Anything it prints is a finding: surface it and offer to commit it (the write skills commit as they go, so a backlog here means content written before this discipline existed, edits made outside the skills, or a stalled session). Empty output means the vault is clean or not a git repo — nothing to flag.
-
-## Graph health is a separate pass
-
-Groom checks **lifecycle hygiene** — stale WIP, missing acceptance, dangling ADRs, spent handoffs. It does **not** check the link graph (orphan concepts, broken links, missing `index.md` MOCs, unlinked mentions). That's `agent-vault:weave`'s job. When doing a thorough tidy, run weave alongside groom — lifecycle hygiene keeps the *board* honest; weave keeps the *brain* traversable. If the user says "clean up the whole vault," do both and present the findings together.
-
-## How to present findings
-
-Group by severity / actionability:
-
-```
-**Needs attention now:**
-- task `auth-refactor` is in-progress and untouched 11d — block it or close it
-- ADR-003 still proposed after 21d — enact or reject
-
-**Worth a pass:**
-- 3 todo tasks missing acceptance prose — clarify before starting
-- README current-focus hasn't changed in 14d while 4 tasks closed — update?
-- handoff `2026-05-20-0900` links a task URI now in `done` — mark it spent so SessionStart stops surfacing it
-
-**Just noticing:**
-- backlog has been empty 7d
-- 2 orphan docs in docs/
-```
-
-Propose specific actions ("move X to done with outcome `...`"). Wait for the user to confirm before doing — grooming is the user's call, not yours.
-
-## What it does NOT do
-
-- Doesn't modify anything by default. Surfaces findings and proposes; the user (or `agent-vault:task-flow`) does the moves.
-- Doesn't groom *across* projects. Per-project pass; cross-project portfolio grooming would be a separate skill if useful.
-- Doesn't enforce a particular cadence — runs when invoked, that's it.
+Group findings by consequence and actionability. Give the record, supporting evidence,
+why it matters, and a specific proposed action. Separate uncertain observations from
+confirmed stale state, and report any authorized changes and their verification.
+Leave unrequested changes as proposals without turning routine findings into gates.

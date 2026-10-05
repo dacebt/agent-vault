@@ -8,4 +8,5 @@ generated:
 ---
 # {{DATE}}
 
-_(what happened today — work done, decisions made, things stuck, things learned. The journal is where the graph gets densest: link tasks with immutable task URIs and file concepts with bundle-relative links — `[auth refactor](task:<uuid>)`, `[token rotation](/docs/decisions/ADR-005-token-rotation.md)` — so "what was I doing" stays answerable.)_
+_(Replace with observed work, findings, outcomes, and useful next-work context.
+Link related records when they exist; omit empty sections.)_

@@ -82,10 +82,15 @@ def command_update(args: argparse.Namespace) -> None:
             "priority": args.priority,
             "milestone": args.milestone,
             "sort_order": args.sort_order,
+            "tags": parse_tags(args.tags) if args.tags is not None else None,
             "body_markdown": read_body(args.body_file) if args.body_file else None,
         }.items()
         if value is not None
     }
+    for field in args.clear:
+        if field in changes:
+            raise ValueError(f"cannot both set and clear {field}")
+        changes[field] = None
     connection = task_store.connect(args.project)
     try:
         emit(task_store.update_task(connection, args.task, changes, args.actor))
@@ -103,7 +108,6 @@ def command_transition(args: argparse.Namespace) -> None:
                 args.status,
                 actor=args.actor,
                 note=args.note,
-                allow_wip=args.allow_wip,
             )
         )
     finally:
@@ -159,6 +163,12 @@ def parser() -> argparse.ArgumentParser:
     update.add_argument("--priority")
     update.add_argument("--milestone")
     update.add_argument("--sort-order", type=int)
+    update.add_argument("--tags", help="comma-separated tags; an empty string clears them")
+    update.add_argument(
+        "--clear", action="append", default=[],
+        choices=("description", "priority", "milestone", "sort_order"),
+        help="clear an optional field; repeat for multiple fields",
+    )
     update.add_argument("--body-file")
     update.add_argument("--actor", default=task_store.DEFAULT_ACTOR)
     update.set_defaults(run=command_update)
@@ -167,8 +177,7 @@ def parser() -> argparse.ArgumentParser:
     transition.add_argument("project")
     transition.add_argument("task")
     transition.add_argument("status", choices=task_store.TASK_STATUSES)
-    transition.add_argument("--note")
-    transition.add_argument("--allow-wip", action="store_true")
+    transition.add_argument("--note", help="optional context appended when the status changes")
     transition.add_argument("--actor", default=task_store.DEFAULT_ACTOR)
     transition.set_defaults(run=command_transition)
 

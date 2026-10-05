@@ -1,74 +1,78 @@
 ---
 name: bootstrap
 description: >-
-  Scaffold the per-project Agent Vault bundle (task board, decisions, knowledge,
-  journal, handoffs, views), then extract a starting graph spine from the repo — observable
-  architecture, conventions, and domain concepts. Use when the user says "set up the vault",
-  "initialize the project", or "start tracking this project", or when another vault skill needs
-  the scaffold and it's missing. Idempotent; extraction re-runs on demand.
+  Set up a project's Agent Vault for knowledge, tasks, journals, and handoffs.
+  Use to initialize project tracking or supply missing storage for another vault skill,
+  with optional initial context from the project.
 ---
 
 # agent-vault:bootstrap
 
-Before using bundled files, set `AGENT_VAULT_PLUGIN_ROOT` to the plugin root two levels above the directory containing this loaded `SKILL.md`. Resolve it from the loaded skill path on every invocation; do not assume a checkout path or rely on a host-specific plugin-root variable.
+Establish a usable home for this project's records. An empty knowledge layer is a
+valid starting point: setup does not depend on having code, established conventions,
+or an architecture to document. A request for storage, including one from another
+vault skill, is complete when the scaffold is usable; return to the calling work.
 
-Two phases: **scaffold** (silent, idempotent) and **extraction** (read the repo, write an observable, *linked* graph spine — never fabricate what isn't visible).
+Match initial content to the request and available evidence. Preserve existing
+records on repeat setup. Bootstrap writes to the vault, not the source project,
+and does not invent tasks, decisions, conventions, or links to fill a structure.
 
-The product of bootstrap is an **OKF knowledge bundle**: a directory of markdown concepts wired into a graph and navigated by an agent. So extraction doesn't just dump prose — it lays a small spine of linked concepts plus the `index.md` MOCs that make them navigable.
+## Operating map
 
-## When to use
+- Establish storage with the bundled helpers below.
+- When the request includes initial project knowledge, use [capture](../capture/SKILL.md)
+  for its writing guidance, templates, and connections. Read those resources only
+  for content being written.
+- Verify the actual result, preserve it, and report what changed.
 
-- User says "set up the vault" / "initialize this project" / "start tracking this".
-- Another skill needs the scaffold and it isn't there.
-- SessionStart preamble was absent because the project subdir didn't exist, but the user is now invoking vault behavior.
+## Establish storage
 
-## Phase 1 — scaffold (silent)
+Resolve the plugin root from this loaded `SKILL.md`: two directories above
+`skills/bootstrap/`. Helper paths below are relative to that root; use quoted
+absolute paths in commands. This works in Claude Code and Codex without requiring
+an environment variable in the skill's execution context.
 
-Run `${AGENT_VAULT_PLUGIN_ROOT}/bin/bootstrap-project.sh`. It locates the vault root (fixed location `~/agent-vault`, overridable via `AGENT_VAULT`), resolves the project name from git-root basename, creates the layer directories and `tasks/tasks.sqlite3`, writes a typed starter `README.md`, and writes the root `index.md` declaring `okf_version: "0.2"`. Existing files are left alone. If legacy task Markdown exists, bootstrap fails closed and names the migration command rather than creating a second task authority.
+From the intended source project, run `bin/bootstrap-project.sh`. It resolves the
+project through the existing discovery helpers and creates missing layer directories,
+`tasks/tasks.sqlite3`, a starter `README.md`, and the root `index.md`. Existing files
+are preserved; a repeat invocation is not a request to refresh or replace content.
 
-Before extraction, verify that `<project-path>/index.md` declares OKF v0.2 and that `${AGENT_VAULT_PLUGIN_ROOT}/bin/task-db.py validate <project-path>` succeeds. If either check fails, stop and report that the scaffold is incomplete; do not describe the project as bootstrapped.
+For first use when the containing vault root does not exist, use its configured
+absolute location (`AGENT_VAULT`, otherwise `~/agent-vault`) with
+`bin/resolve-project.sh <vault-root>`, then pass the resulting project path to
+`bin/bootstrap-project.sh <project-path>`. The explicit destination form creates
+missing parent directories. Keep that resolved destination for the rest of the work.
 
-## Phase 2 — extraction (observable only, and linked)
+Inspect the resulting scaffold, including the root index's `okf_version: "0.2"`,
+and run `python3 <plugin-root>/bin/task-db.py validate <project-path>` before claiming
+the full scaffold is ready. Existing legacy tasks or damaged records need an honest
+report of what was created, what remains usable, and what failed; setup does not
+authorize migrating, deleting, or replacing existing data.
 
-**The principle: write what the code shows, never what you'd have to guess.** Architecture, conventions, how things actually work — observable. Decisions, intent, options-considered — *not* observable from code; do not invent them.
+## Initial context when useful
 
-Read: the repo `README.md`; the manifest (`package.json` / `Cargo.toml` / `pyproject.toml` / `go.mod` / `marketplace.json` / …); `ls` + `find -maxdepth 3 -type d` for layout; 5–10 sampled files across main areas; `git log --oneline -20` for *current activity* (drives the README focus theme, NOT ADRs); any `CLAUDE.md` / top-level docs.
+For a request that includes populating project knowledge, read enough relevant
+project material to support the content. Let the useful information determine the
+notes and their depth; there are no required topic filenames or sampling quotas.
+An established project may support architectural observations and recurring patterns.
+A greenfield project may supply only its intended purpose from the user's context.
+Keep intended direction distinguishable from implemented behavior.
 
-From those, draft the spine as **linked OKF concepts** (each `type: note`, with `title`/`description`/`tags`, lifecycle `status: stable`, and `generated.by`/`generated.at`, from `${AGENT_VAULT_PLUGIN_ROOT}/templates/note.md`). Use a full ISO 8601 timestamp with timezone and keep tags to YAML-safe kebab-case strings. Add `sources` when a note is materially derived from specific repo artifacts. Read `${AGENT_VAULT_PLUGIN_ROOT}/reference/linking.md` first — the spine's value is the links between its concepts.
+Reuse and extend relevant records through capture. A project with no established
+conventions needs no conventions note. Code and commits can support observations,
+but do not establish decision rationale. Recording a real decision or a requested
+task follows capture's corresponding path, not an automatic bootstrap checklist.
+Keep the README's identity and focus grounded in known context rather than filling
+unknowns with guesses. Empty sections do not prevent using the vault.
 
-### `knowledge/architecture.md`
-The observable architecture: top-level layout (what's under each main directory), how the pieces compose (manifests, entry points, module shapes), languages/frameworks/build tooling, integration boundaries. **Descriptive, not opinionated** — record *what* is structured, not *why* (that's a decision). Link out to `conventions.md` and to any subsystem notes you write.
+## Preserve and report
 
-### `knowledge/conventions.md`
-Patterns visible across multiple files: filename patterns, import/module/function shapes (form, not substance), test framework + placement, where docs live, recurring domain vocabulary. If a convention isn't visible across several files, it isn't a convention — don't claim it. Link to `architecture.md`.
+For scaffold-only setup as well as initial content, durability-commit the exact files
+created or changed with `bin/vault-commit.sh <message> <changed-file>...`. Preserve
+unrelated vault changes. Confirm the commit before claiming durability; the helper
+can silently skip it when Git is unavailable or the destination is not a repository.
 
-### Domain-concept notes (the spine that matters)
-If the repo has distinct domain entities or subsystems worth their own node (a core abstraction, a custom DSL, a non-obvious integration), draft one short note per such concept and **link them to each other and to architecture.md** — this is what turns flat documentation into a navigable graph. Cap at 2–3 for the first pass; the user can ask for more. Prefer a few well-linked concept notes over one long undifferentiated prose dump.
-
-### `index.md` MOCs
-Write `knowledge/index.md` listing every note you drafted (one entry each, using its `description`), from `${AGENT_VAULT_PLUGIN_ROOT}/templates/index.md`. Leave `docs/decisions/index.md` to be created when the first ADR lands. The root `index.md` already exists from Phase 1.
-
-### `README.md` — fill the identity section
-- `## What this is` — one paragraph from the repo README + structure.
-- `## Current focus` — a *theme* from clustering recent commit subjects ("hardening validation gates"), not "just shipped commit X" (that's journal). If a section is genuinely uninferrable, leave the placeholder and mention the gap.
-
-## What this phase does NOT do
-
-- **Does not generate ADRs.** Commits show *what* changed; ADRs document *why* and what alternatives were rejected — the agent cannot reconstruct intent from git log. ADRs come from `agent-vault:decide` when real decisions are made.
-- **Does not fabricate** decision workflow state, decision dates, or "options considered." Standard template lifecycle metadata is not evidence about a historical decision.
-- **Does not write tasks autonomously** — the user's coordination layer needs explicit intent.
-- **Does not leave the spine unlinked or unindexed** — a pile of disconnected notes is not a bundle. Link them; index them.
-- **Does not use `[[wikilinks]]`** — OKF-native markdown links.
-- **Does not modify the project's source repo.**
-
-## Completion
-
-After extraction, durability-commit the exact files written with `${AGENT_VAULT_PLUGIN_ROOT}/bin/vault-commit.sh`.
-
-## Reporting back
-
-Tell the user **what you wrote, not what you want to ask**:
-
-> Vault scaffolded for `<project>` as an Agent Vault OKF v0.2 bundle with a SQLite task store. Drafted `knowledge/architecture.md`, `knowledge/conventions.md`, `<N>` concept notes, the `knowledge/index.md` MOC, and the README identity — all linked, from repo state. Review the drafts in the bundle or a compatible viewer; they are observations, not final.
-
-Then stop.
+Report the resolved vault path and the actual outcome: storage created or reused,
+any context added, and any incomplete operation. Distinguish scaffold readiness from
+knowledge coverage. When called by another skill, return that result so the requested
+capture or handoff can continue without an extra knowledge-extraction phase.

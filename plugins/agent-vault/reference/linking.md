@@ -1,15 +1,16 @@
 # Linking doctrine — how to wire a concept into the graph
 
-The vault combines an **OKF v0.2 Markdown bundle** with SQLite-backed task concepts provided by the Agent Vault task extension. Both providers participate in one logical graph. Base OKF conformance allows broken links; this plugin deliberately adds a stronger graph-quality profile, so linking remains a gate on every write.
+The vault combines an **OKF v0.2 Markdown bundle** with SQLite-backed task concepts provided by the Agent Vault task extension. Both participate in one logical graph. Links make related information easier to retrieve; they are not prerequisites for carrying out a requested write, edit, move, or status change.
 
-## The gate (non-negotiable)
+## Connect what is genuinely related
 
-A concept is not done until **both** hold:
+Add useful links when the relationship is known, and explain why it matters. Use directory indexes to make file concepts discoverable. If no relevant neighbour exists, save the supported content without inventing one or asking the user to resolve a linking requirement. Missing inbound or outbound links do not make the requested work incomplete.
 
-1. **It links out.** ≥1 outbound link to an existing concept it builds on, depends on, contrasts with, or explains.
-2. **It earns a link in.** Either a concept you already have gains a return link to the new one, **or** you add the new one to its directory `index.md`. A concept with zero inbound links is an orphan — fix it now, not "later."
+- **Notes, documents, and decisions** benefit from topic relationships and directory index entries. Maintain those as part of the relevant write when useful, without imposing link counts or unrelated graph repairs.
+- **Tasks** are discoverable through the database-backed task board. Link supporting concepts when known; creation, editing, and status moves are independent of those links.
+- **Journals and handoffs** are discovered through chronology and resume-point listings. They can link to the work they describe without needing reciprocal topic links.
 
-If you genuinely cannot find a single neighbour, that is a signal the concept is mis-scoped or the bundle is missing a hub — say so; don't ship the orphan silently.
+Graph maintenance can surface opportunities to improve retrieval. Its findings do not block unrelated requested work.
 
 ## Link syntax
 
@@ -25,7 +26,7 @@ Relative file links are legal but discouraged. A task URI never contains its sta
 
 OKF semantics: a link from A to B asserts *a relationship*; the **kind** of relationship lives in the surrounding prose ("supersedes", "depends on", "contradicts"), not in the link itself. So always frame the link with a word that says why it's there.
 
-Broken links are legal (OKF consumers must tolerate them), so a **forward link to a concept you haven't written yet is fine** — it marks intent. But don't lean on it; create the target when you can.
+Broken links are legal (OKF consumers must tolerate them). A forward link can mark an intended concept; it does not authorize creating that concept or expanding the current task.
 
 ## What to link (link the nouns, not the filler)
 
@@ -41,7 +42,7 @@ Do **not** link every word. Over-linking is noise; link the entities, not the co
 
 ## Unlinked mentions — the highest-value reflex
 
-When your prose *names* a concept that already exists in the bundle (an ADR id, a topic note's title, a task) as plain text, **link it**. An unlinked mention is a missing edge. Before finishing a write, scan what you wrote for names of existing concepts and wire them. (`agent-vault:weave` finds the ones you miss — but catch them at write time.)
+When your prose names an existing concept and the connection helps a future reader, link the mention. Prefer meaningful navigation over mechanically linking every name. `agent-vault:weave` can review missed connections when graph maintenance is requested.
 
 ## Aliases
 
@@ -62,10 +63,6 @@ Links are directional and not always symmetric, but **hubs aggregate their inbou
 - **supersession chains** are bidirectional: the new ADR links the old; the old ADR's OKF lifecycle `status` becomes `deprecated`, its `decision_status` becomes `superseded by ADR-NNN`, and it links forward.
 - **journal → everything**: the journal is the densest hub. It links out freely and is rarely linked back to (that's correct — it's a timeline, not a topic).
 
-## Quick self-check before you save
+## Applying the guidance
 
-- [ ] At least one outbound markdown link to a real concept?
-- [ ] An inbound link exists (return link added, or listed in `index.md`)?
-- [ ] Every existing-concept name in the prose is linked, not bare?
-- [ ] File targets use exact bundle-relative paths and task targets use immutable task URIs?
-- [ ] The prose says *why* each link is there?
+Use exact bundle paths for file links and immutable task URIs for task links. Keep the relationship clear in the surrounding prose, and update relevant index entries when adding or changing file concepts. Preserve existing useful links during edits. None of this requires an unrelated cleanup pass before fulfilling the user's request.

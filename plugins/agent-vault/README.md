@@ -17,12 +17,12 @@ Each direct child of the containing root is an independent project bundle select
 - `.claude-plugin/plugin.json` — Claude Code manifest with inline lifecycle hooks.
 - `.codex-plugin/plugin.json` — Codex manifest with skills and hook configuration paths.
 - `hooks.json` — Codex lifecycle hooks using `${PLUGIN_ROOT}`.
-- `skills/` — thirteen project-memory and viewer-lifecycle skills.
+- `skills/` — eleven project-memory and viewer-lifecycle skills.
 - `bin/` — discovery, bootstrap, task, graph, hook, durability, validation, migration, and viewer lifecycle commands.
 - `lib/` — SQLite task-store and hybrid graph implementation.
 - `templates/` — OKF v0.2 project concepts.
 - `reference/` — linking doctrine, SQLite schema, and task-consumer contract.
-- `viewer/` — dependency-free read-only Node server and browser client mirrored from `ebt-vault-viewer`.
+- `viewer/` — dependency-free read-only Node server and browser client adapted from `ebt-agent-skills/plugins/ebt-vault/viewer/`.
 - `tests/` — OKF, task-store, migration, rollback, graph, bootstrap, and commit-link coverage.
 
 ## Hook lifecycle
@@ -39,13 +39,17 @@ PreCompact gives a read-only `codex exec` only the newest 512 KiB of transcript 
 
 ## Skills
 
-`bootstrap`, `capture`, `decide`, `groom`, `handoff`, `journal`, `orient`, `recall`, `refresh`, `render`, `task-flow`, `viewer`, and `weave` are discovered from `skills/`. Installed skill commands resolve their scripts, templates, references, and viewer runtime from the loaded Agent Vault plugin root; they do not depend on this repository’s checkout path.
+`bootstrap`, `capture`, `groom`, `handoff`, `journal`, `orient`, `recall`, `refresh`, `render`, `viewer`, and `weave` are discovered from `skills/`. Installed skill commands resolve their scripts, templates, references, and viewer runtime from the loaded Agent Vault plugin root; they do not depend on this repository’s checkout path.
 
 The `viewer` skill delegates background ownership to `bin/viewer.sh`. It keeps an agent-started server inside a persistent terminal session, reports its exact URL and state, refuses PID ownership conflicts, and stops only the process it verifies as its own. People invoking the launcher in their own terminal can use its detached `start` operation directly.
 
 ## Storage contract
 
 Markdown concepts and SQLite task concepts share one graph. File concepts use bundle-relative Markdown links; task concepts use immutable `task:<uuid>` links. See [the SQLite task contract](reference/sqlite-task-contract.md) and [linking doctrine](reference/linking.md).
+
+Manual operations use scaffold-only bootstrap, consolidated capture for decisions and task content, and [direct task commands](reference/task-commands.md) without transition or WIP prerequisites. The existing orient, handoff, render, and hook behavior remains as documented above until automatic continuity is synchronized.
+
+The development authority for both plugin and viewer is `ebt-agent-skills/plugins/ebt-vault`. This package adapts that source to Agent Vault namespaces; release versions remain independently owned.
 
 ## Verification
 

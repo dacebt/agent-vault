@@ -50,7 +50,7 @@
     for (const part of joined.split("/")) {
       if (!part || part === ".") continue;
       let segment = part;
-      try { segment = decodeURIComponent(part); } catch { /* keep raw on malformed escapes */ }
+      try { segment = decodeURIComponent(part); } catch {}
       if (segment === "..") segments.pop();
       else segments.push(segment);
     }

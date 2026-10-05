@@ -244,7 +244,7 @@ Finished.
 
     def test_viewer_fixture_builder_produces_the_published_contract(self) -> None:
         destination = Path(self.temp.name) / "sqlite-fixture"
-        builder = PLUGIN_ROOT / "tests/build-sqlite-fixture.py"
+        builder = PLUGIN_ROOT / "tests/build-viewer-sqlite-fixture.py"
 
         result = subprocess.run(
             [sys.executable, str(builder), str(destination)],

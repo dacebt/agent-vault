@@ -1,0 +1,11 @@
+This file keeps an otherwise-empty directory in git.
+
+`fixture-beta/tasks/done/` has to exist and hold no tasks. A status
+directory that is present but empty takes a different path through the
+viewer than one that is missing entirely — the missing case drops the
+column, the empty case renders it with a zero count — and this is the
+fixture's only example of the empty case. `fixture-beta/tasks/backlog/`
+covers the missing case by not existing.
+
+Deleting this file deletes that coverage, and nothing will fail to notice.
+The name is not `.md`, so the board never sees it as a task.

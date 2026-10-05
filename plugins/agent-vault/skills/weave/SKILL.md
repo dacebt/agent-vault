@@ -1,98 +1,102 @@
 ---
 name: weave
 description: >-
-  Maintain the health of the vault's OKF link graph — find and fix orphan concepts, dangling
-  links, unlinked mentions, stale or missing index.md MOCs, and legacy [[wikilinks]]. Use when the
-  user wants to "weave the vault", "tighten the links", "find orphans", "fix the graph", "connect
-  related notes", "build the indexes", or after a burst of capture. Checks the link graph —
-  distinct from agent-vault:groom, which audits task/decision/handoff hygiene.
+  Review and improve navigation through a vault's knowledge graph: links, indexes,
+  disconnected concepts, and useful relationships. Use to audit or fix the graph,
+  connect related notes, weave the vault, or build indexes. Lifecycle review belongs
+  to agent-vault:groom.
 ---
 
 # agent-vault:weave
 
-Before using bundled files, set `AGENT_VAULT_PLUGIN_ROOT` to the plugin root two levels above the directory containing this loaded `SKILL.md`. Resolve it from the loaded skill path on every invocation; do not assume a checkout path or rely on a host-specific plugin-root variable.
+Make related knowledge easier to find and traverse. Read the
+[linking guidance](../../reference/linking.md) before interpreting findings or changing
+links. Useful relationships matter more than link counts: a valid record can remain
+unlinked, and an audit finding does not make unrelated requested work incomplete.
 
-A knowledge graph rots the same way a garden does: new concepts land under-linked, links go stale when files move, MOCs fall behind their directories. **weave** is the deliberate pass that keeps the OKF bundle traversable — because an orphan concept never surfaces in recall, and a graph with no edges is just a folder of files.
+Match action to the request. An audit produces findings and proposed repairs. An
+authorized repair or enrichment request permits supported changes within its scope,
+without another approval round for the same work. Ask only where intent or scope is
+unresolved. [Groom](../groom/SKILL.md) owns lifecycle review;
+[capture](../capture/SKILL.md) owns writing new knowledge and decisions.
 
-Distinct from `agent-vault:groom`: groom checks *task/decision/handoff lifecycle hygiene* (stale WIP, missing acceptance, dangling ADRs). weave checks *graph health* (the links themselves).
+## Locate resources and inspect the graph
 
-## When to use
+Resolve the plugin root from this loaded `SKILL.md`: two directories above
+`skills/weave/`. Helper paths below are relative to that root; use quoted absolute
+paths in commands rather than depending on a host-specific environment variable.
+Run `bin/resolve-project.sh` from the intended source checkout to locate its vault
+project; `bin/find-vault.sh` resolves the containing root. Keep reads and repairs
+within the requested project and graph scope.
 
-- The user asks to "weave", "tighten the links", "find orphans", "connect the notes", "fix the graph", "build the indexes".
-- After a burst of `agent-vault:capture` / a migration / a long session that produced several new concepts.
-- Periodically, the way you'd groom a board — the graph drifts silently.
+For a graph-wide pass, run `bin/graph-audit.sh <project-path>`. It reports **ORPHANS**,
+**DANGLING LINKS**, **LEGACY WIKILINKS**, **MISSING INDEX**, **INDEX GAPS**, and
+**UNLINKED MENTIONS**, plus a machine-readable `SUMMARY:` line. It does not edit files
+or establish that every finding needs repair. Use `--quick` for intermediate triage;
+it skips unlinked mentions and does not replace the initial or final full audit of a
+graph-wide pass. A request about particular concepts can use focused reads and
+`bin/backlinks.sh <project-path> <concept-id>` without expanding into a whole-vault audit.
 
-## How it works
+Inspect findings against their source records. Distinguish confirmed breakage, useful
+navigation opportunities, false positives, intentional forward links, and valid records
+that need no additional links. Account for each finding within the requested scope.
 
-1. Resolve vault + project.
-2. Run the graph audit:
-   ```
-   ${AGENT_VAULT_PLUGIN_ROOT}/bin/graph-audit.sh <project-path>
-   ```
-   It reports six findings, each only when present: **ORPHANS**, **DANGLING LINKS**, **LEGACY WIKILINKS**, **MISSING INDEX**, **INDEX GAPS**, **UNLINKED MENTIONS**. It reports; it never edits.
+Choose delegation only when the amount and independence of the work justify it.
+Small passes can stay with one agent. When delegating, assign each finding and changed
+path to one owner, keep connected changes together, and collect evidence and unresolved
+dependencies. The main agent verifies returned dispositions and the assembled result.
+An empty audit needs no verification agents.
 
-   Pass `--quick` for fast intermediate triage when you only need orphans, dangling links, legacy wikilinks, and index health. `--quick` skips the alias-aware unlinked-mention scan; it never substitutes for the initial or final full audit. Either mode ends with a machine-readable `SUMMARY:` line.
-3. For backlink questions while triaging ("does anything point at this orphan?"), use:
-   ```
-   ${AGENT_VAULT_PLUGIN_ROOT}/bin/backlinks.sh <project-path> <concept-id>
-   ```
-4. If the audit has no findings, do not spawn verification subagents. If it has findings, the main agent must delegate their verification:
-   - Choose the number of subagents from the finding count, connected neighborhoods, and overlap. Assign every finding to exactly one owner; keep tightly connected findings together.
-   - Give each subagent only its assigned findings and the project path. Subagents inspect the relevant concepts read-only and return a disposition for every finding: confirmed defect, false positive, or intentional forward link; exact evidence; a proposed repair when confirmed; and any cross-partition dependency.
-   - Subagents do not run the graph audit or settle cross-partition conflicts. The main agent alone runs the initial audit gate, checks every returned disposition against the source, reconciles dependencies, and accounts for every finding.
-5. Triage the verified findings into one concrete repair proposal and **propose before applying** — the link graph is judgment-laden; a wrong link is worse than a missing one.
-6. After approval, partition the accepted repairs into non-overlapping subagent assignments. Each subagent edits only its assigned vault paths, runs the relevant focused checks, and returns its changed paths and evidence. The main agent inspects the assembled diff, resolves every overlap or cross-partition dependency, and runs the final audit gate.
+## Interpret and repair findings
 
-## Fixing each finding
+- **Orphans:** read the concept and look for useful discovery routes or real neighbours.
+  Add relationships or index entries when they help retrieval. Leave valid standalone
+  records alone; neither missing links nor a helper's suggested remedy requires a fix.
+- **Dangling links:** verify whether the target moved, is intentionally planned, or is
+  no longer relevant. Correct a known path or remove a confirmed obsolete reference
+  within the repair scope. Preserve deliberate forward links. A missing target does
+  not authorize creating a concept to satisfy the audit.
+- **Legacy wikilinks:** resolve the intended target before converting to standard
+  Markdown links. An ambiguous target needs clarification, not a guessed relationship.
+- **Missing indexes and index gaps:** make useful file concepts discoverable through
+  their directory index. When creating an index, use the existing
+  [index template](../../templates/index.md) and supported concept descriptions. Tasks
+  already have their database-backed board; chronological records have their own
+  discovery routes.
+- **Unlinked mentions:** confirm both the intended concept and the navigation value
+  before adding a link. Naming a concept alone does not require linking every mention.
 
-Read `${AGENT_VAULT_PLUGIN_ROOT}/reference/linking.md` first — every fix follows the doctrine.
+When enrichment is requested, look beyond reported breakage for relationships that
+help a reader understand or continue the work. Explain each relationship in its
+surrounding prose. Do not manufacture links, new content, or work to make the graph denser.
 
-- **ORPHANS** — a concept with no links in or out. Read it, find its real neighbours in the bundle, add an outbound `## See also` link or two, and add it to its directory `index.md` so it earns an inbound link. If it has no genuine neighbour, it may be mis-scoped — flag it, don't fabricate a link.
-- **DANGLING LINKS** — a markdown link whose target file doesn't exist. Either the target moved (fix the path) or it was never created (create the concept, or remove the link if it's truly dead). OKF tolerates broken links, so a deliberate forward-link to a planned concept is fine — leave those, fix the accidents. **When the dangling links are the fallout of a rename** (a concept's file was moved/renamed and every inbound link now points at the old path), don't hand-fix each one — that's what `${AGENT_VAULT_PLUGIN_ROOT}/bin/rename-concept.sh` is for (see below).
-- **LEGACY WIKILINKS** — `[[...]]` not yet migrated. Convert to bundle-relative markdown links, resolving the target.
-- **MISSING INDEX** — a `knowledge/` or `docs/` directory with concepts but no `index.md`. Build one from `${AGENT_VAULT_PLUGIN_ROOT}/templates/index.md`, one entry per concept using its `description`.
-- **INDEX GAPS** — a concept not listed in its directory's `index.md`. Add the entry.
-- **UNLINKED MENTIONS** — bare text naming an existing concept (these are *candidates*; the audit is conservative). Confirm the mention really refers to that concept, then turn it into a link. Skip false positives.
+## Rename and repair moved concepts
 
-## Renaming a concept safely
+For an authorized rename that has not happened yet, use
+`bin/rename-concept.sh <project-path> <old-path> <new-path>`. The helper moves the existing
+file and updates references; it requires the old file to exist and the destination to
+be unused. Inspect the resulting links and any affected indexes.
 
-When a concept needs a new name or path — a topic note that outgrew its filename, an ADR slug that no longer fits — moving the file by hand strands every inbound link and seeds a wave of dangling links. Use the helper instead:
+When a concept has already moved, verify its current destination and repair stale
+references to that destination. Do not use the rename helper as though the old file
+still exists or move the record again just to repair its links. Preserve historical
+meaning and report any ambiguous target instead of guessing.
 
-```
-${AGENT_VAULT_PLUGIN_ROOT}/bin/rename-concept.sh <project-path> <old-path> <new-path>
-```
+## Verify, preserve, and report
 
-It moves the file and rewrites every bundle-relative link that pointed at the old path (across all layers and the `index.md` MOCs) so nothing dangles. Reach for it whenever the user wants to rename/move a concept, or when a finding is "dangling links all trace back to one concept that was renamed." Re-run the graph audit afterward.
+Inspect the diff for intended targets, relationship meaning, and changes outside the
+authorized scope. Re-read affected references and indexes after a focused repair;
+after a graph-wide repair, rerun the full graph audit and reconcile its findings with
+the earlier dispositions. Remaining intentional links or standalone records can be
+valid outcomes. A clean audit is not proof of content truth or format conformance;
+the optional format validator is a separate diagnostic, not a completion gate here.
 
-## The enrichment sweep (beyond fixing breakage)
+Durability-commit only the exact files changed with
+`bin/vault-commit.sh <message> <changed-file>...`, preserving unrelated changes. Confirm
+the result before claiming durability; the helper can silently skip a commit. An
+audit-only request creates no changes to commit. Do not delete concepts during weaving.
 
-weave isn't only repair. When asked to "connect related notes" or after new content lands, actively look for concepts that *should* link but don't yet — related decisions, a note that explains an ADR, a journal entry discussing a task. Add the real edges. This is what keeps the graph getting denser instead of just not-broken. Only genuine relationships; frame each link with why in the prose.
-
-## Graph shape (optional report)
-
-When the user wants a sense of the graph, not just fixes, surface: total concepts, orphan count, the most-linked hubs (run `backlinks.sh` on a few candidate concepts), and which directories have MOCs. A one-paragraph "here's the shape of your brain" read.
-
-## How to present
-
-Group by actionability, like groom:
-
-```
-**Broken — fix now:**
-- `knowledge/foo.md` is an orphan — no links in or out
-- dangling: `journal/2026-06-12.md` → `/docs/decisions/ADR-009.md` (missing)
-
-**Worth weaving:**
-- 3 unlinked mentions of `ADR-005` across journal entries
-- `knowledge/index.md` missing entries for 2 notes
-
-**Just noticing:**
-- 14 concepts, 2 hubs, knowledge/ well-connected; tasks/ sparse (expected)
-```
-
-Propose specific fixes; apply once the user confirms (or apply the unambiguous mechanical ones — index gaps, legacy wikilinks — and propose the judgment-laden ones). After edits, re-run both gates and durability-commit only the exact files changed.
-
-## What it does NOT do
-
-- Doesn't touch task lifecycle (`agent-vault:groom`) or write new knowledge from scratch (`agent-vault:capture`).
-- Doesn't fabricate links to clear an orphan — a forced link is graph noise.
-- Doesn't delete concepts. A truly dead concept is flagged for the user, not removed.
+Report confirmed problems, useful opportunities, and intentional remaining findings
+with their evidence and proposed or completed action. For repairs, include what changed
+and how it was checked. Add graph counts, hubs, or directory coverage when the user wants
+an overview; keep the report proportional to the request.

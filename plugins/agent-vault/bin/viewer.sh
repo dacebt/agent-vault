@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-PLUGIN_ROOT="${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}}"
+PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 viewer_server="$PLUGIN_ROOT/viewer/server.mjs"
 vault="${AGENT_VAULT:-$HOME/agent-vault}"
 port="${PORT:-7373}"
@@ -19,6 +19,8 @@ pid_file="$state_dir/viewer.pid"
 port_file="$state_dir/viewer.port"
 vault_file="$state_dir/viewer.vault"
 server_file="$state_dir/viewer.server"
+instance_id_file="$state_dir/viewer.instance-id"
+instance_id_temp_file="$state_dir/viewer.instance-id.tmp"
 log_file="$state_dir/viewer.log"
 operation="${1:-start}"
 
@@ -28,7 +30,9 @@ fail() {
 }
 
 clear_state() {
-  rm -f -- "$pid_file" "$port_file" "$vault_file" "$server_file"
+  rm -f -- \
+    "$pid_file" "$port_file" "$vault_file" "$server_file" \
+    "$instance_id_file" "$instance_id_temp_file"
 }
 
 clear_state_for_pid() {
@@ -41,12 +45,19 @@ clear_state_for_pid() {
   return 0
 }
 
-write_state() {
+write_pending_state() {
   local child_pid="$1"
+  rm -f -- "$instance_id_file" "$instance_id_temp_file"
   printf '%s\n' "$child_pid" > "$pid_file"
   printf '%s\n' "$port" > "$port_file"
   printf '%s\n' "$vault" > "$vault_file"
   printf '%s\n' "$viewer_server" > "$server_file"
+}
+
+write_instance_id() {
+  local instance_id="$1"
+  printf '%s\n' "$instance_id" > "$instance_id_temp_file"
+  mv -f -- "$instance_id_temp_file" "$instance_id_file"
 }
 
 require_runtime() {
@@ -79,11 +90,12 @@ pid_visible_without_signal() {
 }
 
 read_instance() {
+  local active_port url
   instance_pid=""
   instance_server=""
-  [[ -f "$pid_file" && -f "$server_file" ]] || return 1
+  instance_id=""
+  [[ -f "$pid_file" ]] || return 1
   IFS= read -r instance_pid < "$pid_file" || return 1
-  IFS= read -r instance_server < "$server_file" || return 1
   case "$instance_pid" in
     ''|*[!0-9]*) return 1 ;;
   esac
@@ -91,9 +103,15 @@ read_instance() {
     pid_visible_without_signal "$instance_pid" && return 2
     return 1
   fi
-  [[ "$instance_server" == */viewer/server.mjs ]] || return 2
+  [[ -f "$server_file" && -f "$port_file" && -f "$instance_id_file" ]] || return 2
+  IFS= read -r instance_server < "$server_file" || return 2
+  IFS= read -r active_port < "$port_file" || return 2
+  IFS= read -r instance_id < "$instance_id_file" || return 2
+  [[ "$instance_server" == "$viewer_server" ]] || return 2
   command_line="$(ps -p "$instance_pid" -o command= 2>/dev/null)" || return 2
   [[ "$command_line" == *"$instance_server"* ]] || return 2
+  url="http://127.0.0.1:$active_port/api/health"
+  health_matches "$url" "$instance_pid" "$instance_id" || return 2
   return 0
 }
 
@@ -105,11 +123,17 @@ stored_value() {
   printf '%s' "${value:-$fallback}"
 }
 
-health_check() {
-  local url="$1"
+health_identity() {
+  local url="$1" expected_pid="$2"
   node -e \
-    "fetch(process.argv[1]).then(async response => { const body = await response.json(); if (!response.ok || body.ok !== true) process.exit(1); }).catch(() => process.exit(1));" \
-    "$url" >/dev/null 2>&1
+    "fetch(process.argv[1], { signal: AbortSignal.timeout(1000) }).then(async response => { const body = await response.json(); const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/; if (!response.ok || body.ok !== true || body.pid !== Number(process.argv[2]) || typeof body.instanceId !== 'string' || !uuid.test(body.instanceId)) process.exit(1); process.stdout.write(body.instanceId); }).catch(() => process.exit(1));" \
+    "$url" "$expected_pid" 2>/dev/null
+}
+
+health_matches() {
+  local url="$1" expected_pid="$2" expected_instance_id="$3" observed_instance_id
+  observed_instance_id="$(health_identity "$url" "$expected_pid")" || return 1
+  [[ "$observed_instance_id" == "$expected_instance_id" ]]
 }
 
 print_status() {
@@ -137,7 +161,7 @@ status_viewer() {
 }
 
 start_viewer() {
-  local state child_pid url attempt
+  local state child_pid url attempt observed_instance_id
   if read_instance; then
     print_status
     return 0
@@ -156,7 +180,7 @@ start_viewer() {
   nohup env AGENT_VAULT="$vault" PORT="$port" node "$viewer_server" \
     </dev/null >>"$log_file" 2>&1 &
   child_pid=$!
-  write_state "$child_pid"
+  write_pending_state "$child_pid"
   url="http://127.0.0.1:$port/api/health"
 
   for ((attempt = 1; attempt <= 50; attempt += 1)); do
@@ -165,7 +189,8 @@ start_viewer() {
       clear_state_for_pid "$child_pid"
       fail "viewer exited before becoming healthy"
     fi
-    if health_check "$url"; then
+    if observed_instance_id="$(health_identity "$url" "$child_pid")"; then
+      write_instance_id "$observed_instance_id"
       instance_pid="$child_pid"
       print_status
       return 0
@@ -173,12 +198,11 @@ start_viewer() {
     sleep 0.1
   done
 
-  if read_instance; then
-    kill "$instance_pid" 2>/dev/null || true
-  fi
+  kill "$child_pid" 2>/dev/null || true
+  wait "$child_pid" 2>/dev/null || true
   tail -n 20 "$log_file" >&2 || true
   clear_state_for_pid "$child_pid"
-  fail "viewer did not become healthy within 5 seconds"
+  fail "viewer did not become healthy during startup checks"
 }
 
 stop_viewer() {
@@ -223,7 +247,7 @@ session_cleanup() {
 }
 
 session_viewer() {
-  local state url attempt exit_code
+  local state url attempt exit_code observed_instance_id
   if read_instance; then
     print_status
     return 0
@@ -242,7 +266,7 @@ session_viewer() {
   env AGENT_VAULT="$vault" PORT="$port" node "$viewer_server" \
     </dev/null >>"$log_file" 2>&1 &
   child_pid=$!
-  write_state "$child_pid"
+  write_pending_state "$child_pid"
   trap session_cleanup EXIT HUP INT TERM
   url="http://127.0.0.1:$port/api/health"
 
@@ -251,7 +275,8 @@ session_viewer() {
       tail -n 20 "$log_file" >&2 || true
       fail "viewer exited before becoming healthy"
     fi
-    if health_check "$url"; then
+    if observed_instance_id="$(health_identity "$url" "$child_pid")"; then
+      write_instance_id "$observed_instance_id"
       instance_pid="$child_pid"
       print_status
       set +e
@@ -266,7 +291,7 @@ session_viewer() {
   done
 
   tail -n 20 "$log_file" >&2 || true
-  fail "viewer did not become healthy within 5 seconds"
+  fail "viewer did not become healthy during startup checks"
 }
 
 case "$operation" in

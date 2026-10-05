@@ -12,15 +12,16 @@ background-process, PID, health-check, or shutdown behavior with ad hoc shell co
 
 ## Resolve the launcher
 
-Resolve the installed plugin root as the directory two levels above this loaded `SKILL.md`, then
-invoke:
+Resolve the installed plugin root two levels above the directory containing this loaded
+`SKILL.md`: `<plugin>/skills/viewer/SKILL.md` resolves to `<plugin>`. For example, with
+`skill_file` set to the absolute path of this loaded file:
 
 ```sh
+AGENT_VAULT_PLUGIN_ROOT="$(cd "$(dirname "$skill_file")/../.." && pwd)"
 bash "${AGENT_VAULT_PLUGIN_ROOT}/bin/viewer.sh" <operation>
 ```
 
-`AGENT_VAULT_PLUGIN_ROOT` above is a descriptive placeholder for the resolved absolute path. Do not
-assume a development-checkout path or depend on the current working directory.
+Do not assume a development-checkout path or depend on the current working directory.
 
 ## Choose the operation
 
@@ -33,6 +34,12 @@ assume a development-checkout path or depend on the current working directory.
 - Use `run` only when the user explicitly requests an attached foreground process.
 
 `start` is the direct background command for a person running the launcher from their own terminal.
+
+Own an agent-started terminal session through output collection and verified shutdown. Before
+ending your turn, use `stop`, collect the terminal's exit, and verify `status`, unless the user
+explicitly requested that the viewer stay running beyond the session. For that requested lifetime,
+hand off its terminal session ID, PID, URL, vault root, log path, and exact `status`/`stop` commands.
+If no persistent terminal tool is available, report that limitation rather than launching detached.
 
 The launcher defaults to `AGENT_VAULT` or `~/agent-vault` and port `7373`. Preserve user-provided
 `AGENT_VAULT`, `PORT`, and `AGENT_VAULT_VIEWER_STATE_DIR` values.
@@ -47,6 +54,6 @@ After `session`, `start`, or `status`, report the exact URL, PID, vault root, an
 the launcher. After `stop`, report that it stopped and include the emitted log path. Do not open or
 control a browser unless the user asks.
 
-If the launcher reports that a recorded PID does not match its viewer server, stop and surface the
-ownership conflict. Never kill, replace, or claim that process manually. The viewer binds only to
-loopback and reads task databases in read-only mode.
+If the launcher reports that a recorded PID does not match its viewer server or ownership cannot
+be verified, stop and surface the ownership conflict. Never kill, replace, or claim that process
+manually. The viewer binds only to loopback and reads task databases in read-only mode.

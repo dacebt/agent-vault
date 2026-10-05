@@ -1,0 +1,6 @@
+{
+  "entrypoint": "PORT=7399 node .wsd/run-sqlite-fixture-server.mjs",
+  "type": "server",
+  "health": "http://127.0.0.1:7399/api/board?project=viewer-sqlite-fixture",
+  "timeout_seconds": 15
+}

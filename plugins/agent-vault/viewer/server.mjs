@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,9 +8,7 @@ import { createVaultStore } from './src/server/vault-store.mjs';
 import { ProjectDatabaseError, taskIdentifier } from './src/server/task-database.mjs';
 
 const ROOT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_VAULT = path.resolve(
-  process.env.AGENT_VAULT || path.join(os.homedir(), 'agent-vault'),
-);
+const DEFAULT_VAULT = path.resolve(process.env.AGENT_VAULT || path.join(os.homedir(), 'agent-vault'));
 const DEFAULT_PORT = Number(process.env.PORT) || 7373;
 const HOST = '127.0.0.1';
 
@@ -93,6 +92,7 @@ function watchVault(vault, broadcastChange) {
 }
 
 export function createViewerServer(options = {}) {
+  const instanceId = randomUUID();
   const vault = path.resolve(options.vault || DEFAULT_VAULT);
   const port = options.port === undefined ? DEFAULT_PORT : Number(options.port);
   const rootDir = options.rootDir || ROOT_DIR;
@@ -118,7 +118,7 @@ export function createViewerServer(options = {}) {
       if (!vaultStore.isUsable()) {
         return sendJson(res, 503, { ok: false, vault, error: 'vault unavailable' });
       }
-      return sendJson(res, 200, { ok: true, vault });
+      return sendJson(res, 200, { ok: true, vault, pid: process.pid, instanceId });
     }
 
     if (pathname === '/api/projects') {

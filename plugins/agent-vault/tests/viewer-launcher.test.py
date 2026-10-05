@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import urllib.request
 from pathlib import Path
@@ -42,13 +43,16 @@ class ViewerLauncherTest(unittest.TestCase):
         }
 
     def tearDown(self) -> None:
-        subprocess.run(
+        stopped = subprocess.run(
             ["bash", str(LAUNCHER), "stop"],
             env=self.environment,
             capture_output=True,
             text=True,
             check=False,
+            timeout=10,
         )
+        self.assertEqual(stopped.returncode, 0, stopped.stderr)
+        self.assertFalse((self.state / "viewer.pid").exists())
         self.temp.cleanup()
 
     def invoke(self, operation: str, *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -58,6 +62,7 @@ class ViewerLauncherTest(unittest.TestCase):
             capture_output=True,
             text=True,
             check=check,
+            timeout=15,
         )
 
     def test_start_status_api_and_stop_share_one_owned_process(self) -> None:
@@ -65,6 +70,16 @@ class ViewerLauncherTest(unittest.TestCase):
         self.assertIn(f"url: http://127.0.0.1:{self.port}", started.stdout)
         self.assertIn(f"vault: {self.vault}", started.stdout)
         started_pid = (self.state / "viewer.pid").read_text(encoding="utf-8").strip()
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{self.port}/api/health", timeout=2
+        ) as response:
+            health = json.load(response)
+        self.assertEqual(health["pid"], int(started_pid))
+        self.assertEqual(
+            health["instanceId"],
+            (self.state / "viewer.instance-id").read_text(encoding="utf-8").strip(),
+        )
 
         with urllib.request.urlopen(
             f"http://127.0.0.1:{self.port}/api/projects", timeout=2
@@ -91,6 +106,26 @@ class ViewerLauncherTest(unittest.TestCase):
         self.assertFalse((self.state / "viewer.pid").exists())
         self.assertIn("viewer stopped", self.invoke("status").stdout)
 
+    def test_launcher_resolves_bundled_server_from_its_own_path(self) -> None:
+        environment = {
+            **self.environment,
+            "PLUGIN_ROOT": str(self.root / "unrelated-plugin"),
+            "CLAUDE_PLUGIN_ROOT": str(self.root / "unrelated-claude-plugin"),
+        }
+        started = subprocess.run(
+            ["bash", str(LAUNCHER), "start"],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=15,
+        )
+        self.assertIn(f"url: http://127.0.0.1:{self.port}", started.stdout)
+        self.assertEqual(
+            (self.state / "viewer.server").read_text(encoding="utf-8").strip(),
+            str(PLUGIN_ROOT / "viewer" / "server.mjs"),
+        )
+
     def test_live_unowned_pid_is_refused_and_left_running(self) -> None:
         self.state.mkdir(parents=True)
         (self.state / "viewer.pid").write_text(f"{os.getpid()}\n", encoding="utf-8")
@@ -98,11 +133,108 @@ class ViewerLauncherTest(unittest.TestCase):
             f"{PLUGIN_ROOT / 'viewer' / 'server.mjs'}\n", encoding="utf-8"
         )
 
-        result = self.invoke("stop", check=False)
+        try:
+            for operation in ("start", "session", "status", "stop"):
+                with self.subTest(operation=operation):
+                    result = self.invoke(operation, check=False)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("refusing", result.stderr)
+                    os.kill(os.getpid(), 0)
+                    self.assertEqual(
+                        (self.state / "viewer.pid").read_text().strip(), str(os.getpid())
+                    )
+        finally:
+            (self.state / "viewer.pid").unlink()
+            (self.state / "viewer.server").unlink()
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("refusing to stop it", result.stderr)
-        os.kill(os.getpid(), 0)
+    def test_stale_identity_cannot_claim_or_stop_same_server_path_process(self) -> None:
+        server = PLUGIN_ROOT / "viewer" / "server.mjs"
+        process = subprocess.Popen(
+            ["node", str(server)],
+            env={**self.environment, "PORT": str(self.port)},
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            for _attempt in range(50):
+                if process.poll() is not None:
+                    assert process.stderr is not None
+                    self.fail(process.stderr.read())
+                try:
+                    with urllib.request.urlopen(
+                        f"http://127.0.0.1:{self.port}/api/health", timeout=1
+                    ) as response:
+                        live_health = json.load(response)
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            else:
+                self.fail("separately launched viewer did not become healthy")
+
+            self.state.mkdir(parents=True)
+            (self.state / "viewer.pid").write_text(f"{process.pid}\n", encoding="utf-8")
+            (self.state / "viewer.server").write_text(f"{server}\n", encoding="utf-8")
+            (self.state / "viewer.port").write_text(f"{self.port}\n", encoding="utf-8")
+            (self.state / "viewer.vault").write_text(f"{self.vault}\n", encoding="utf-8")
+
+            pending = self.invoke("status", check=False)
+            self.assertNotEqual(pending.returncode, 0)
+            self.assertIn("refusing", pending.stderr)
+            self.assertIsNone(process.poll())
+            self.assertEqual((self.state / "viewer.pid").read_text().strip(), str(process.pid))
+
+            (self.state / "viewer.instance-id").write_text(
+                "00000000-0000-4000-8000-000000000000\n", encoding="utf-8"
+            )
+            self.assertNotEqual(live_health["instanceId"], "00000000-0000-4000-8000-000000000000")
+
+            for operation in ("start", "session", "status", "stop"):
+                with self.subTest(operation=operation):
+                    result = self.invoke(operation, check=False)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("refusing", result.stderr)
+                    self.assertIsNone(process.poll())
+                    self.assertEqual(
+                        (self.state / "viewer.pid").read_text().strip(), str(process.pid)
+                    )
+        finally:
+            for name in (
+                "viewer.pid",
+                "viewer.server",
+                "viewer.port",
+                "viewer.vault",
+                "viewer.instance-id",
+            ):
+                (self.state / name).unlink(missing_ok=True)
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
+            if process.stderr is not None:
+                process.stderr.close()
+
+    def test_occupied_healthy_port_cannot_be_claimed_as_new_child(self) -> None:
+        self.invoke("start")
+        existing_pid = int((self.state / "viewer.pid").read_text())
+        for operation in ("start", "session"):
+            with self.subTest(operation=operation):
+                competing_state = self.root / f"competing-{operation}"
+                result = subprocess.run(
+                    ["bash", str(LAUNCHER), operation],
+                    env={**self.environment, "AGENT_VAULT_VIEWER_STATE_DIR": str(competing_state)},
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertFalse((competing_state / "viewer.pid").exists())
+                os.kill(existing_pid, 0)
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{self.port}/api/health", timeout=2
+                ) as response:
+                    health = json.load(response)
+                self.assertTrue(health["ok"])
+                self.assertEqual(health["pid"], existing_pid)
 
     def test_persistent_agent_session_remains_manageable_from_other_calls(self) -> None:
         process = subprocess.Popen(
@@ -129,6 +261,33 @@ class ViewerLauncherTest(unittest.TestCase):
             if process.poll() is None:
                 process.terminate()
                 process.wait(timeout=2)
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
+
+    def test_terminating_agent_session_retires_child_and_state(self) -> None:
+        process = subprocess.Popen(
+            ["bash", str(LAUNCHER), "session"],
+            env=self.environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            assert process.stdout is not None
+            startup = "".join(process.stdout.readline() for _ in range(5))
+            self.assertIn("viewer running", startup)
+            child_pid = int((self.state / "viewer.pid").read_text())
+            process.terminate()
+            process.wait(timeout=5)
+            self.assertFalse((self.state / "viewer.pid").exists())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pid, 0)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
             if process.stdout is not None:
                 process.stdout.close()
             if process.stderr is not None:

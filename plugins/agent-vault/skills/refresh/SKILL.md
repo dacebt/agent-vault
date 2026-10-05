@@ -1,90 +1,95 @@
 ---
 name: refresh
 description: >-
-  Content-truth pass on the vault — reads knowledge notes, docs, and the README and verifies
-  their claims against the repo as it exists now, surfacing drifted facts, superseded notes, and
-  decisions reality has quietly walked away from. Use when the user wants to "refresh the vault",
-  "sweep for outdated info", "check the docs against the code", or asks "is this still accurate" /
-  "what's out of date". Checks what the content claims, not lifecycle (agent-vault:groom) or the link
-  graph (agent-vault:weave).
+  Verify current claims in vault notes, docs, and README against project evidence,
+  and correct them when requested. Use to check whether a note is still accurate
+  or bring stale vault content up to date. Lifecycle hygiene belongs to agent-vault:groom;
+  link mechanics belong to agent-vault:weave.
 ---
 
 # agent-vault:refresh
 
-Before using bundled files, set `AGENT_VAULT_PLUGIN_ROOT` to the plugin root two levels above the directory containing this loaded `SKILL.md`. Resolve it from the loaded skill path on every invocation; do not assume a checkout path or rely on a host-specific plugin-root variable.
+Establish which stored claims remain accurate, which have drifted, and which cannot
+be verified. A named-concept request goes straight to that material; a broad sweep
+covers the requested layers. Keep historical records distinguishable from current
+guidance.
 
-A note can be perfectly linked, tidily statused, and wrong. `architecture.md` keeps describing a directory that was renamed two months ago; a how-to walks through a flag that no longer exists; the README's "current focus" is three milestones stale. groom never catches this (it reads lifecycle metadata, not claims) and weave never catches it (a link to a well-formed file resolves whether or not the prose around it is still true). **refresh** is the pass that reads what the vault *asserts* and checks it against reality.
+An audit or accuracy question is read-only. A request to correct or refresh content
+authorizes supported corrections within its stated scope; do not ask for that same
+permission again. If a finding needs a new decision, unavailable evidence, or work
+beyond the request, report the issue and proposed next action without inventing a fix.
 
-The hygiene triad: **groom** keeps the *board* honest, **weave** keeps the *graph* traversable, **refresh** keeps the *content* true.
+[Capture](../capture/SKILL.md) writes from information already established in the
+session. Refresh verifies existing claims against evidence. Either may update a
+record, but finding stale content does not authorize filling every gap in the vault.
 
-## When to use
+## Scope and resources
 
-- The user asks to "refresh the vault", "sweep for outdated info", "check what's still accurate", "audit the docs against the code".
-- After a burst of repo change — a rename, a restructuring, a milestone — that the knowledge layer hasn't caught up with.
-- Periodically, like the other two passes — content drifts silently every time the repo moves and the vault doesn't.
-- Scoped, when one concept smells stale: "is the architecture note still right?"
+Current claims commonly live in `knowledge/`, `docs/`, and the project `README.md`.
+Judge the claim's intended time frame, not just its directory: a dated audit in
+`knowledge/` remains history even when today's system differs. Do not rewrite
+journals or handoffs into current guidance, delete concepts, or change task lifecycle.
 
-## What's in scope
+Read ADRs for the choice and its context; leave their bodies unchanged in this pass.
+Implementation divergence does not prove that a replacement choice was made.
+Report that discrepancy separately from factual documentation drift. Recording an
+actual replacement decision follows [capture](../capture/SKILL.md) and its
+[decision guidance](../capture/references/decisions.md), including the supersession
+chain, only when decision evidence and user intent support it.
 
-Only layers that make claims about **current** reality:
+Resolve the plugin root from this loaded `SKILL.md`: two directories above
+`skills/refresh/`. Helper paths below are relative to that root. Use quoted absolute
+paths without relying on a host-specific environment variable. From the intended
+source checkout, run `bin/resolve-project.sh` to locate its vault project;
+`bin/find-vault.sh` resolves the containing root. Check that the project exists;
+report missing storage or resolution failures without silently creating records.
 
-- `knowledge/` notes — observations, references, distilled insights
-- `docs/` — how-tos and structural references (the most brittle: they name paths, commands, rosters)
-- `README.md` — project identity and especially the current-focus section
-- `docs/decisions/` — **read-only**: an ADR is a point-in-time record and its body is never edited, but reality can quietly walk away from a decision. Flag that; the fix routes through `agent-vault:decide` as a superseding ADR.
+## Verify the claims
 
-Explicitly out of scope: `journal/` and `handoffs/` (dated history — an entry is true *of its date*; rewriting it is falsifying the diary), and `tasks/` (lifecycle is groom's job).
+For a broad sweep, prioritize consequential, frequently used claims and material
+likely affected by known changes. `generated.at`, Git history, and
+`bin/backlinks.sh <project-path> <concept-path>` can help choose what to inspect.
+Age, connectivity, and lack of Git activity do not prove truth or falsehood.
 
-## How it works
+Identify concrete assertions: paths, names, versions, commands, responsibilities,
+described behavior, and current focus. Inspect declared `sources` as part of the
+claim's provenance. Check paths and manifests directly, and read the relevant source
+for behavioral claims. When static evidence is insufficient, state the limit or
+use an appropriate authorized observation; do not run a command merely because an
+old note recommends it. Unavailable external evidence and unknown intent remain
+unverified rather than becoming guesses.
 
-1. Resolve vault + project.
-2. **Inventory and prioritize.** List the in-scope concepts. `generated.at` is the age signal; `${AGENT_VAULT_PLUGIN_ROOT}/bin/backlinks.sh <project-path> <concept-id>` tells you which are hubs. A full sweep starts with the old, load-bearing concepts (architecture doc, hub notes, README); a scoped run goes straight to the named concept.
-3. **Extract the checkable claims.** For each concept, list what it asserts about reality: paths and filenames, component/skill/agent rosters, commands and flags, names, versions, described behavior. Also its `sources` frontmatter, if present — do those artifacts still exist?
-4. **Verify — cheap checks first.** Mechanical: does every repo path the concept names still exist? Do the named things still carry those names? Then semantic: read the relevant code, manifests, and README and ask whether the *described behavior* still matches. `git log --oneline --since=<generated.at> -- <paths the concept describes>` is the drift detector — heavy churn since the note was written means read carefully; silence means it's probably still true.
-5. **Triage each finding** (taxonomy below) and **propose before applying** — every fix here rewrites a claim, and a confidently wrong "fix" is worse than the stale original.
+Classify findings by their meaning and consequence:
 
-## The finding taxonomy
+- **Drifted claim:** update the supported fact while preserving the useful concept.
+- **Superseded current guidance:** revise it, or preserve historical value by marking
+  it deprecated and linking an existing replacement where one is known. A dated
+  historical account does not need deprecation simply because the system changed.
+- **Decision divergence:** report the difference between the recorded choice and
+  current implementation; do not manufacture a superseding ADR from code alone.
+- **Stale focus:** update the README from supported current context. A task's status
+  alone does not prove its original scope was delivered.
+- **Unverifiable claim:** explain the evidence gap without rewriting it into a new guess.
 
-- **Drifted claim** — the concept is sound but a fact inside it is no longer true (renamed path, changed roster, moved responsibility). Fix: update the claim in place, advance `generated.at` (the concept changed), leave the rest alone.
-- **Superseded concept** — the whole note describes a former world. Don't delete it. Either rewrite it to describe the current world (advance `generated.at`), or — when the old description has historical value — set lifecycle `status: deprecated` and add a link to the concept that now covers the territory.
-- **Decision walked away from** — an accepted ADR whose context or consequences no longer hold in the repo. Never edit the ADR body. Flag it and propose a superseding ADR through `agent-vault:decide`, which handles the bidirectional supersession chain.
-- **Stale README focus** — the current-focus section describes finished or abandoned work. Propose the one-paragraph update.
-- **Unverifiable claim** — asserts something you can't check against the repo (an external system, a claim about intent). Flag it as unverified; don't guess, don't "fix" it into a different guess.
+For an audit, give the evidence and proposed correction. For authorized updates,
+apply supported corrections and report unresolved findings. Keep the finding and
+its disposition clear without imposing a fixed report template.
 
-## After edits
+## Preserve authorized changes
 
-- Advance `generated.at` (full ISO 8601 with timezone) on every concept whose content changed; keep the existing `generated.by` convention.
-- If a fix changed link targets or removed a name other concepts mention, re-run `${AGENT_VAULT_PLUGIN_ROOT}/bin/graph-audit.sh --quick <project-path>` — content fixes can create graph debt. A concept that needs a new *filename* is a rename: hand that to `${AGENT_VAULT_PLUGIN_ROOT}/bin/rename-concept.sh` (weave's territory) rather than moving it by hand.
-- **Commit for durability**: `${AGENT_VAULT_PLUGIN_ROOT}/bin/vault-commit.sh "docs(vault): refresh <what>" <exact files touched>` — scoped commit, never `git add -A`, no co-author trailer.
+Advance `generated.at` with a full timezone-aware timestamp on changed concepts,
+preserving the existing `generated.by` convention. Align descriptions and relevant
+index entries with changed content. Do not add verification claims without evidence.
 
-## Not capture's update path
+Check relationships affected by the edits. If link targets changed, use
+`bin/graph-audit.sh --quick <project-path>` to inspect the fallout; unrelated findings
+do not become prerequisites for the correction. A needed rename follows
+[weave](../weave/SKILL.md) and the bundled rename helper so incoming references are
+preserved, rather than a manual file move. Do not broaden a content pass into a
+general graph repair.
 
-`agent-vault:capture` also updates vault content when the user says "update the project docs" — but capture is **write-oriented**: it fills gaps opportunistically from what this session already knows. refresh is **verification-oriented**: it systematically reads what's already written and checks it against the repo, whether or not this session touched that territory. Capture fills the gaps; refresh finds the lies. A broad "bring the docs up to date" often wants both: refresh to find what's wrong, capture to write what's missing.
-
-## How to present findings
-
-Group by severity, like the other passes:
-
-```
-**Wrong now:**
-- `knowledge/architecture.md` describes `plugins/wsd/` and an `statusline` plugin — both renamed; roster is 2 plugins behind
-- `docs/deploy.md` step 3 uses a `--legacy-peer-deps` flag the script no longer accepts
-
-**Worth a pass:**
-- README current focus still says "OKF migration" — done 3 weeks ago per the task database
-- ADR-002's consequences section predates the codex-plugin split — consider a superseding ADR
-
-**Just noticing:**
-- `knowledge/wsd-audit-2026-05-24.md` describes a former state by design (dated audit) — accurate as history, no action
-```
-
-Propose the specific rewrite for each ("change X to Y because the repo now Z"). Apply once the user confirms, then make the scoped durability commit.
-
-## What it does NOT do
-
-- Doesn't touch task lifecycle, WIP, or handoff spending — that's `agent-vault:groom`.
-- Doesn't fix link mechanics (orphans, dangling links, MOC gaps) beyond the fallout of its own edits — that's `agent-vault:weave`. A thorough vault health check is all three.
-- Doesn't rewrite `journal/` or `handoffs/` — dated history stays as written.
-- Doesn't edit ADR bodies — supersession via `agent-vault:decide` is the only path.
-- Doesn't delete concepts. A dead concept is deprecated with a pointer, or flagged — never removed.
-- Doesn't guess. A claim it can't verify is reported as unverified, not silently rewritten into a new claim.
+Commit the exact changed files with
+`bin/vault-commit.sh "docs(vault): refresh <what>" <changed-file>...`, including any
+affected indexes or relationship records. Preserve unrelated changes and confirm the
+actual commit before claiming durability: the helper can silently skip or fail to
+commit. Report what was checked, changed, left uncertain, and preserved successfully.

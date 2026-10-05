@@ -16,13 +16,6 @@ TASK_URI_RE = re.compile(
 )
 TASK_STATUSES = ("backlog", "todo", "in-progress", "blocked", "done")
 OKF_STATUSES = ("draft", "stable", "deprecated")
-TRANSITIONS = {
-    "backlog": {"todo"},
-    "todo": {"in-progress"},
-    "in-progress": {"blocked", "done"},
-    "blocked": {"in-progress", "done"},
-    "done": {"in-progress"},
-}
 DEFAULT_ACTOR = "process:agent-vault-task-store"
 
 
@@ -94,15 +87,6 @@ def _json(value: Any, expected: type, field: str) -> str:
     if not isinstance(value, expected):
         raise TaskStoreError(f"{field} must be {expected.__name__}")
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def _section(body: str, heading: str) -> str | None:
-    pattern = re.compile(
-        rf"^##\s+{re.escape(heading)}\s*$\n(?P<body>.*?)(?=^##\s+|\Z)",
-        re.IGNORECASE | re.MULTILINE | re.DOTALL,
-    )
-    match = pattern.search(body)
-    return match.group("body").strip() if match else None
 
 
 def _task_values(task: dict[str, Any]) -> tuple[Any, ...]:
@@ -221,14 +205,17 @@ def update_task(
     actor: str = DEFAULT_ACTOR,
 ) -> dict[str, Any]:
     current = find_task(connection, identifier)
-    allowed = {"title", "description", "priority", "milestone", "sort_order", "body_markdown"}
+    allowed = {"title", "description", "priority", "milestone", "sort_order", "body_markdown", "tags"}
     rejected = sorted(set(changes) - allowed)
     if rejected:
         raise TaskStoreError(f"unsupported task fields: {', '.join(rejected)}")
     if not changes:
         return current
-    assignments = [f"{field} = ?" for field in changes]
-    values = list(changes.values()) + [actor, now_iso(), current["id"]]
+    updates = dict(changes)
+    if "tags" in updates:
+        updates["tags_json"] = _json(updates.pop("tags"), list, "tags")
+    assignments = [f"{field} = ?" for field in updates]
+    values = list(updates.values()) + [actor, now_iso(), current["id"]]
     with connection:
         connection.execute(
             f"UPDATE tasks SET {', '.join(assignments)}, generated_by = ?, generated_at = ? "
@@ -245,32 +232,23 @@ def transition_task(
     *,
     actor: str = DEFAULT_ACTOR,
     note: str | None = None,
-    allow_wip: bool = False,
 ) -> dict[str, Any]:
     current = find_task(connection, identifier)
     source = current["task_status"]
-    if destination not in TRANSITIONS.get(source, set()):
-        raise TaskStoreError(f"invalid task transition: {source} -> {destination}")
+    if destination not in TASK_STATUSES:
+        raise TaskStoreError(f"invalid task_status: {destination}")
+    if destination == source:
+        return current
     body = current["body_markdown"]
-    if source == "backlog" and destination == "todo" and not _section(body, "Acceptance"):
-        raise TaskStoreError("backlog -> todo requires a non-empty Acceptance section")
-    if destination == "in-progress" and source == "todo" and not allow_wip:
-        count = connection.execute(
-            "SELECT count(*) FROM tasks WHERE task_status IN ('in-progress', 'blocked')"
-        ).fetchone()[0]
-        if count >= 2:
-            raise TaskStoreError("starting this task would exceed the WIP limit; pass --allow-wip")
-    if destination == "done" and not (_section(body, "Outcome") or _section(body, "Outcomes")):
-        raise TaskStoreError("completion requires a non-empty Outcome section")
-    today = datetime.now().astimezone().date().isoformat()
-    if destination == "blocked":
-        if not note:
-            raise TaskStoreError("blocking a task requires --note")
-        body = body.rstrip() + f"\n\n## Blocked by\n{note.strip()}\n"
-    if source == "done" and destination == "in-progress":
-        if not note:
-            raise TaskStoreError("reopening a task requires --note")
-        body = body.rstrip() + f"\n\n## Reopened {today}\n{note.strip()}\n"
+    if note and note.strip():
+        today = datetime.now().astimezone().date().isoformat()
+        if destination == "blocked":
+            heading = "Blocked by"
+        elif source == "done":
+            heading = f"Reopened {today}"
+        else:
+            heading = f"Status note {today}"
+        body = body.rstrip() + f"\n\n## {heading}\n{note.strip()}\n"
     timestamp = now_iso()
     started_at = current["started_at"]
     if destination == "in-progress" and not started_at:

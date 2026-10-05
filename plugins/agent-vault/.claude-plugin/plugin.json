@@ -1,7 +1,7 @@
 {
   "name": "agent-vault",
   "version": "0.11.1",
-  "description": "A durable project-memory plugin for Claude Code backed by independently bootstrapped bundles under ~/agent-vault (overridable via AGENT_VAULT). Each project combines OKF v0.2 Markdown concepts with SQLite-backed tasks, decisions, knowledge, journals, handoffs, and a bundled loopback-only viewer. SessionStart orients, PostToolUse links commits, PreCompact preserves volatile state, and SessionEnd captures substantive work. Silently no-ops outside a tracked project bundle.",
+  "description": "Durable project memory under ~/agent-vault (overridable via AGENT_VAULT): scaffold-only setup, knowledge and decision capture, direct SQLite task changes, retrieval, journals, handoffs, and a bundled loopback-only viewer. Existing hooks orient sessions, link new commits to an active task, preserve unfinished work before compaction, and capture substantive work at session end. Silently no-ops outside a tracked project bundle.",
   "author": {
     "name": "David Colon",
     "email": "38386583+Da-Colon@users.noreply.github.com"
