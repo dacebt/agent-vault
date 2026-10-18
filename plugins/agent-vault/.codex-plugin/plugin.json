@@ -1,6 +1,6 @@
 {
   "name": "agent-vault",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Ten project-memory and viewer skills, direct SQLite task edits, a read-only startup resource map, verified commit links, and supervised continuity capture.",
   "author": {
     "name": "David Colon",
