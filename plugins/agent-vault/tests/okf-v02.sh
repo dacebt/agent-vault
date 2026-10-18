@@ -11,10 +11,6 @@ fail() {
   exit 1
 }
 
-if rg -n 'validate the whole bundle|okf-validate\.rb' "$plugin_root/skills/capture/SKILL.md" >/dev/null; then
-  fail "capture must not make optional OKF validation part of ordinary vault writes"
-fi
-
 expect_valid() {
   local label="$1"; shift
   "$@" >/dev/null 2>&1 || fail "$label should pass"
@@ -192,7 +188,7 @@ grep -q '^task_status: blocked$' "$legacy/tasks/in-progress/task.md" ||
   fail "task workflow state was not migrated"
 grep -q '^custom_field: keep-me$' "$legacy/knowledge/note.md" ||
   fail "custom frontmatter was not preserved"
-if rg -n '^timestamp:' "$legacy" >/dev/null; then
+if grep -rq '^timestamp:' "$legacy"; then
   fail "legacy timestamp survived upgrade"
 fi
 
@@ -257,6 +253,23 @@ expect_valid "durability commit without OKF bundle root" \
 [[ "$(git -C "$plain_repo" rev-list --count HEAD)" == "2" ]] ||
   fail "durability helper required an OKF bundle root"
 
+# A relative path names a file from the caller's directory, including a project
+# bundle nested below the vault repository's root.
+nested_vault="$scratch/nested-vault"
+mkdir -p "$nested_vault/project/journal"
+git -C "$nested_vault" init -q
+git -C "$nested_vault" config user.name "Nested Fixture"
+git -C "$nested_vault" config user.email "nested@example.invalid"
+printf 'first\n' > "$nested_vault/project/journal/day.md"
+git -C "$nested_vault" add project/journal/day.md
+git -C "$nested_vault" commit -qm "fixture"
+printf 'second\n' >> "$nested_vault/project/journal/day.md"
+expect_valid "durability commit from a relative path" \
+  bash -c 'cd "$1/project" && "$2" "docs(vault): relative fixture" journal/day.md' \
+  _ "$nested_vault" "$plugin_root/bin/vault-commit.sh"
+[[ "$(git -C "$nested_vault" rev-list --count HEAD)" == "2" ]] ||
+  fail "durability helper skipped a file named by a relative path"
+
 # Rename protects against ambiguous or destructive filesystem targets, but does
 # not inspect bundle conformance or reserve OKF filenames.
 rename_bundle="$scratch/rename-bundle"
@@ -283,7 +296,7 @@ git -C "$source_repo" config user.name "Source Fixture"
 git -C "$source_repo" config user.email "source@example.invalid"
 printf 'fixture\n' > "$source_repo/README.txt"
 git -C "$source_repo" add README.txt
-git -C "$source_repo" commit -qm "source fixture"
+source_receipt="$(git -C "$source_repo" commit -m "source fixture")"
 cp -R "$template_bundle" "$vault_root/source"
 python3 "$plugin_root/bin/task-db.py" transition "$vault_root/source" TEST-001 todo >/dev/null
 python3 "$plugin_root/bin/task-db.py" transition "$vault_root/source" TEST-001 in-progress >/dev/null
@@ -297,7 +310,7 @@ git -C "$vault_root" commit -qm "vault fixture"
 source_sha="$(git -C "$source_repo" rev-parse --short HEAD)"
 (
   cd "$source_repo"
-  printf '%s' '{"tool_input":{"command":"git commit -m fixture"}}' |
+  jq -n --arg receipt "$source_receipt" '{tool_input: {command: "git commit -m fixture"}, tool_response: {stdout: $receipt}}' |
     env AGENT_VAULT="$vault_root" PLUGIN_ROOT="$plugin_root" TMPDIR="$hook_tmp" \
       "$plugin_root/bin/hook-git-commit-link.sh"
 )

@@ -3,7 +3,8 @@
 #
 # Usage: vault-commit.sh <message> <file>...
 #   <message>   one-line conventional commit message (no co-author trailer — none is added).
-#   <file>...   the exact path(s) the calling write skill just created or modified.
+#   <file>...   the exact path(s) the calling write skill just created or modified,
+#               absolute or relative to the caller's current directory.
 #
 # The vault is a git repo but nothing else commits it, so journals/handoffs/ADRs pile up
 # as uncommitted working state and an external brain that can't be restored isn't durable.
@@ -21,6 +22,17 @@ msg="${1:?usage: vault-commit.sh <message> <file>...}"; shift
 [[ $# -gt 0 ]] || { echo "vault-commit: no files given" >&2; exit 2; }
 
 command -v git >/dev/null 2>&1 || exit 0
+
+# Name each file from the caller's directory: git runs from the repository root, which
+# may sit above the project bundle the caller is working in.
+paths=()
+for path in "$@"; do
+  case "$path" in
+    /*) paths+=("$path") ;;
+    *) paths+=("$PWD/$path") ;;
+  esac
+done
+set -- "${paths[@]}"
 
 # Derive the repo from the first path's directory (works for a path that was just deleted
 # too — its parent dir still resolves).

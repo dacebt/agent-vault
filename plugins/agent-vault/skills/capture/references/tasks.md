@@ -11,11 +11,15 @@ number width and choose the next unused number. If none exists, choose a short
 uppercase project prefix starting at `001`. The helper supplies the immutable UUID,
 backlog default, and timestamps.
 
-Compose the body from the requested outcome and known context. When acceptance is
-known, express it as natural prose that helps future work recognize a satisfactory
-resolution. Preserve room for investigation and judgment; include strict requirements
-only when established by the user or project. Missing acceptance, outcomes, reasons,
-or links never block the requested creation, edit, or status move.
+Compose the body from the requested outcome, known context, and any established
+breakdown of the work. A task record coordinates an outcome; it does not make that
+outcome an indivisible execution unit or commit. Execution may be subdivided within
+the approved scope without automatically creating or changing task records; those
+changes remain user-directed. When acceptance is known, express it as natural prose
+that helps future work recognize a satisfactory resolution. Preserve room for
+investigation and judgment; include strict requirements only when established by the
+user or project. Missing acceptance, outcomes, reasons, or links never block the
+requested creation, edit, or status move.
 
 Use `create` with `--body-file` for a new record and `update` for an existing one.
 A body update replaces the stored body, so read it first and preserve content outside
