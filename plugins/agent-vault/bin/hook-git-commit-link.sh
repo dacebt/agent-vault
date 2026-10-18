@@ -48,34 +48,38 @@ def result_text(event: dict) -> str:
     return ""
 
 
-def invokes_commit(event: dict) -> bool:
+def commit_directory_arguments(event: dict) -> list[list[str]]:
     tool_input = event.get("tool_input", event.get("input", {}))
     command = tool_input.get("command") if isinstance(tool_input, dict) else None
     if command is None:
         command = event.get("command")
     if not isinstance(command, str):
-        return False
+        return []
     lexer = shlex.shlex(command, posix=False, punctuation_chars=";&|()\n")
     lexer.whitespace = " \t\r"
     try:
         tokens = list(lexer)
     except ValueError:
-        return False
+        return []
     segments: list[list[str]] = [[]]
     for token in tokens:
         if all(character in ";&|()\n" for character in token):
             segments.append([])
         else:
             segments[-1].append(token)
+    commits: list[list[str]] = []
     for segment in segments:
         while segment and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", segment[0]):
             segment = segment[1:]
         if not segment or Path(segment[0].strip("\"'")).name != "git":
             continue
         index = 1
+        directories: list[str] = []
         while index < len(segment) and segment[index].startswith("-"):
             option = segment[index]
             if option in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"):
+                if option == "-C" and index + 1 < len(segment):
+                    directories.append(segment[index + 1])
                 index += 2
             elif option in (
                 "--no-pager", "--paginate", "--no-optional-locks", "--no-replace-objects"
@@ -86,8 +90,22 @@ def invokes_commit(event: dict) -> bool:
             else:
                 break
         if index < len(segment) and segment[index] == "commit":
-            return True
-    return False
+            commits.append(directories)
+    return commits
+
+
+def commit_directory(base: Path, arguments: list[str]) -> Path | None:
+    directory = base
+    for argument in arguments:
+        text = argument
+        if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+            text = text[1:-1]
+        if not text:
+            continue
+        if text.startswith("~") or re.search(r"[$`\\*?\[{]", text):
+            return None
+        directory = directory / text
+    return directory if directory.is_dir() else None
 
 
 def read_tasks(task_cli: list[str], project: str) -> list[dict]:
@@ -108,24 +126,7 @@ def insert_link(body: str, line: str) -> str:
     return body + ("" if not body or body.endswith("\n") else "\n") + "\n## Commits\n" + line + "\n"
 
 
-def main() -> None:
-    raw = os.fdopen(3).read()
-    if not raw.strip():
-        return
-    event = json.loads(raw)
-    if not isinstance(event, dict):
-        raise CaptureError("hook input must be a JSON object")
-    if not invokes_commit(event):
-        return
-    for key in ("cwd", "current_working_directory"):
-        if key in event:
-            cwd = event[key]
-            if not isinstance(cwd, str) or not cwd or not Path(cwd).is_absolute() or not Path(cwd).is_dir():
-                return
-            os.chdir(cwd)
-            break
-
-    output = re.sub(r"\x1b\[[0-9;]*m", "", result_text(event))
+def link_commits(output: str) -> None:
     receipts = re.findall(r"^\[[^\]\r\n]+ ([0-9a-fA-F]{4,64})\] [^\r\n]*$", output, re.MULTILINE)
     if not receipts:
         return
@@ -190,6 +191,36 @@ def main() -> None:
     actual = checked(["git", "-C", vault_repo, "hash-object", str(database)]).strip()
     if committed != actual:
         raise CaptureError("task database was written but not committed; retry this receipt after resolving vault Git errors")
+
+
+def main() -> None:
+    raw = os.fdopen(3).read()
+    if not raw.strip():
+        return
+    event = json.loads(raw)
+    if not isinstance(event, dict):
+        raise CaptureError("hook input must be a JSON object")
+    commits = commit_directory_arguments(event)
+    if not commits:
+        return
+    base = Path.cwd()
+    for key in ("cwd", "current_working_directory"):
+        if key in event:
+            cwd = event[key]
+            if not isinstance(cwd, str) or not cwd or not Path(cwd).is_absolute() or not Path(cwd).is_dir():
+                return
+            base = Path(cwd)
+            break
+
+    output = re.sub(r"\x1b\[[0-9;]*m", "", result_text(event))
+    targets: list[Path] = []
+    for arguments in commits:
+        target = commit_directory(base, arguments)
+        if target is not None and target not in targets:
+            targets.append(target)
+    for target in targets:
+        os.chdir(target)
+        link_commits(output)
 
 
 try:

@@ -182,6 +182,44 @@ class CommitLinkHookTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(self.body(), "")
 
+    def other_project(self) -> Path:
+        other = self.root / "other project"
+        self.init_repo(other)
+        project = self.vault / other.name
+        self.task("init", project=project)
+        self.task("create", "--key", "FIX-1", "--title", "Other", project=project)
+        self.task("transition", "FIX-1", "in-progress", project=project)
+        return other
+
+    def test_commit_directory_option_attributes_the_receipt_to_the_targeted_repository(self) -> None:
+        other = self.other_project()
+        project = self.vault / other.name
+        for command in (f"git -C '{other}' commit -m fixture",
+                        "git -C '../other project' commit -m fixture",
+                        "git -C .. -C 'other project' commit -m fixture"):
+            with self.subTest(command=command):
+                receipt, sha = self.commit(directory=other)
+                result = self.hook(receipt, command=command)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"`{sha}`", self.body(project=project))
+                self.assertEqual(self.body(), "")
+        database = project / "tasks/tasks.sqlite3"
+        self.assertEqual(self.git(self.vault, "rev-parse", f"HEAD:{database.relative_to(self.vault).as_posix()}").strip(),
+                         self.git(self.vault, "hash-object", str(database)).strip())
+
+    def test_unresolvable_commit_directory_never_falls_back_to_the_session_project(self) -> None:
+        other = self.other_project()
+        project = self.vault / other.name
+        receipt, _ = self.commit(directory=other)
+        for command in ('git -C "$OTHER" commit -m fixture',
+                        "git -C '~/other project' commit -m fixture",
+                        f"git -C '{self.root / 'missing'}' commit -m fixture"):
+            with self.subTest(command=command):
+                result = self.hook(receipt, command=command)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.body(), "")
+                self.assertEqual(self.body(project=project), "")
+
     def test_failed_task_update_is_diagnostic_and_retry_records_same_receipt(self) -> None:
         receipt, sha = self.commit()
         self.stub("task-db.py", "import runpy,sys\nif sys.argv[1] == 'update': sys.exit(9)\nrunpy.run_path(" +
